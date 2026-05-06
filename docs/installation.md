@@ -66,7 +66,36 @@ Additional resources:
 * Full guide: `deployment/systemd/README.md`
 * SELinux and Fail2Ban -> UI HTTP callbacks: [`docs/security.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/security.md#selinux) (often `setsebool -P nis_enabled 1` on RHEL-family hosts)
 
-High-level procedure:
+### Option A: Automated installer (Ubuntu/Debian — recommended)
+
+The bundled `install.sh` script handles all prerequisites, builds the binary, configures the database, and installs a systemd service in one guided session:
+
+```bash
+git clone https://github.com/swissmakers/fail2ban-ui.git /opt/fail2ban-ui
+cd /opt/fail2ban-ui
+sudo ./install.sh
+```
+
+The installer prompts you for:
+
+1. **Install directory** — where to place the binary and source (default `/opt/fail2ban-ui`)
+2. **Database** — SQLite (no setup needed) or PostgreSQL (connection details configured interactively)
+3. **Listen port and bind address** — defaults to `8080` / `127.0.0.1`
+4. **Callback URL** — the public URL fail2ban hosts will POST ban events to
+5. **OIDC** — optionally configure an OIDC provider for single sign-on
+6. **Service user** — which OS user the service runs as
+
+On completion the installer:
+- Writes a config file to `/etc/fail2ban-ui/fail2ban-ui.env` (mode `0600`)
+- Registers and starts `fail2ban-ui.service` via systemd
+
+To update a deployment installed this way, run:
+
+```bash
+sudo /opt/fail2ban-ui/update.sh
+```
+
+### Option B: Manual build
 
 ```bash
 git clone https://github.com/swissmakers/fail2ban-ui.git /opt/fail2ban-ui

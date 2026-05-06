@@ -144,6 +144,56 @@ Related:
 
 - OIDC dev stack: `development/oidc/README.md`
 
+## Database backend
+
+By default Fail2Ban UI stores all data in a local SQLite file. PostgreSQL is supported for deployments that need a shared, external database (e.g. multiple replicas, managed cloud databases).
+
+### SQLite (default)
+
+No extra configuration is needed. The database file is created automatically in the working directory as `fail2ban-ui.db`.
+
+```bash
+# No environment variables required — this is the default.
+```
+
+### PostgreSQL
+
+Set both variables before starting the service:
+
+| Variable | Description |
+|---|---|
+| `DB_TYPE` | Set to `postgres` to enable the PostgreSQL driver. |
+| `DATABASE_URL` | Full [PostgreSQL connection string](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING). |
+
+```bash
+DB_TYPE=postgres
+DATABASE_URL=postgres://fail2ban_ui:yourpassword@localhost:5432/fail2ban_ui?sslmode=disable
+```
+
+**Quick PostgreSQL setup (local, as the `postgres` system user):**
+
+```bash
+sudo -u postgres psql <<'SQL'
+CREATE ROLE fail2ban_ui WITH LOGIN PASSWORD 'yourpassword';
+CREATE DATABASE fail2ban_ui OWNER fail2ban_ui;
+SQL
+```
+
+**SSL modes:**
+
+- `sslmode=disable` — no TLS, recommended when the app and database are on the same host.
+- `sslmode=require` — TLS required, recommended for remote databases.
+
+**Connection pool defaults:**
+
+| Setting | Value |
+|---|---|
+| Max open connections | 25 |
+| Max idle connections | 5 |
+| Max connection lifetime | 5 minutes |
+
+> The installer (`install.sh`) handles PostgreSQL setup interactively and writes the correct `DATABASE_URL` to `/etc/fail2ban-ui/fail2ban-ui.env`.
+
 ## Email template style
 
 - `emailStyle=classic`  

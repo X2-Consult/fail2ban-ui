@@ -405,6 +405,7 @@
                 <option value="mikrotik">Mikrotik</option>
                 <option value="pfsense">pfSense</option>
                 <option value="opnsense">OPNsense</option>
+                <option value="visionone">Trend Micro Vision One</option>
               </select>
               <p class="text-xs text-gray-500 mt-1" data-i18n="settings.advanced.integration_hint">Choose where permanent bans should be synchronized.</p>
             </div>
@@ -492,6 +493,53 @@
                 <div class="flex items-center">
                   <input type="checkbox" id="opnsenseSkipTLS" class="h-4 w-4 text-blue-600 border-gray-300 rounded">
                   <label for="opnsenseSkipTLS" class="ml-2 text-sm text-gray-700" data-i18n="settings.advanced.opnsense.skip_tls">Skip TLS verification (self-signed)</label>
+                </div>
+              </div>
+            </div>
+
+            <div id="advancedVisionOneFields" class="hidden border border-gray-200 rounded-lg p-4 overflow-x-auto bg-gray-50">
+              <p class="text-sm text-gray-500 mb-3" data-i18n="settings.advanced.visionone.note">Adds blocked IPs to the Trend Micro Vision One Suspicious Objects list via the V3 API.</p>
+              <div class="mb-3 text-sm">
+                <a href="https://automation.trendmicro.com/xdr/api-v3" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline" data-i18n="settings.advanced.visionone.api_docs">Vision One API Documentation</a>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700" for="visionOneRegion" data-i18n="settings.advanced.visionone.region">Region</label>
+                  <select id="visionOneRegion" class="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    <option value="us">United States (us)</option>
+                    <option value="eu">Europe (eu)</option>
+                    <option value="jp">Japan (jp)</option>
+                    <option value="sg">Singapore (sg)</option>
+                    <option value="in">India (in)</option>
+                    <option value="au">Australia (au)</option>
+                  </select>
+                  <p class="text-xs text-gray-500 mt-1" data-i18n="settings.advanced.visionone.region_hint">Select the Vision One region matching your tenant.</p>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700" for="visionOneRiskLevel" data-i18n="settings.advanced.visionone.risk_level">Risk Level</label>
+                  <select id="visionOneRiskLevel" class="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-gray-700" for="visionOneAPIToken" data-i18n="settings.advanced.visionone.token">API Token</label>
+                  <input id="visionOneAPIToken" type="password" autocomplete="new-password" class="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500" placeholder="Your Vision One API token">
+                  <p class="text-xs text-gray-500 mt-1" data-i18n="settings.advanced.visionone.token_hint">Generate in Vision One → Administration → API Keys. Requires Threat Intelligence write permission.</p>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700" for="visionOneDaysToExpiration" data-i18n="settings.advanced.visionone.expiry">Days to Expiration</label>
+                  <input id="visionOneDaysToExpiration" type="number" min="0" class="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500" placeholder="0">
+                  <p class="text-xs text-gray-500 mt-1" data-i18n="settings.advanced.visionone.expiry_hint">0 = no expiry. Vision One will automatically remove the object after this many days.</p>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700" for="visionOneDescription" data-i18n="settings.advanced.visionone.description">Description</label>
+                  <input id="visionOneDescription" type="text" class="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500" placeholder="Blocked by Fail2ban-UI">
+                </div>
+                <div class="flex items-center md:col-span-2">
+                  <input type="checkbox" id="visionOneSkipTLS" class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                  <label for="visionOneSkipTLS" class="ml-2 text-sm text-gray-700" data-i18n="settings.advanced.visionone.skip_tls">Skip TLS verification (not recommended)</label>
                 </div>
               </div>
             </div>

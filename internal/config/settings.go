@@ -98,6 +98,16 @@ type AdvancedActionsConfig struct {
 	Mikrotik    MikrotikIntegrationSettings `json:"mikrotik"`
 	PfSense     PfSenseIntegrationSettings  `json:"pfSense"`
 	OPNsense    OPNsenseIntegrationSettings `json:"opnsense"`
+	VisionOne   VisionOneIntegrationSettings `json:"visionOne"`
+}
+
+type VisionOneIntegrationSettings struct {
+	Region           string `json:"region"`           // us, eu, jp, sg, in, au
+	APIToken         string `json:"apiToken"`
+	RiskLevel        string `json:"riskLevel"`         // low, medium, high
+	DaysToExpiration int    `json:"daysToExpiration"`  // 0 = no expiry
+	Description      string `json:"description"`
+	SkipTLSVerify    bool   `json:"skipTLSVerify"`
 }
 
 type MikrotikIntegrationSettings struct {

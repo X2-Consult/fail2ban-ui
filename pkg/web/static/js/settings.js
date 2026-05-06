@@ -521,6 +521,20 @@ function applyAdvancedActionsSettings(cfg) {
   const opnTLS = document.getElementById('opnsenseSkipTLS');
   if (opnTLS) opnTLS.checked = !!opn.skipTLSVerify;
 
+  const vo = cfg.visionOne || {};
+  const voRegion = document.getElementById('visionOneRegion');
+  if (voRegion) voRegion.value = vo.region || 'us';
+  const voToken = document.getElementById('visionOneAPIToken');
+  if (voToken) voToken.value = vo.apiToken || '';
+  const voRisk = document.getElementById('visionOneRiskLevel');
+  if (voRisk) voRisk.value = vo.riskLevel || 'high';
+  const voExpiry = document.getElementById('visionOneDaysToExpiration');
+  if (voExpiry) voExpiry.value = vo.daysToExpiration || 0;
+  const voDesc = document.getElementById('visionOneDescription');
+  if (voDesc) voDesc.value = vo.description || '';
+  const voTLS = document.getElementById('visionOneSkipTLS');
+  if (voTLS) voTLS.checked = !!vo.skipTLSVerify;
+
   updateAdvancedIntegrationFields();
 }
 
@@ -549,6 +563,14 @@ function collectAdvancedActionsSettings() {
       apiSecret: document.getElementById('opnsenseSecret').value.trim(),
       alias: document.getElementById('opnsenseAlias').value.trim(),
       skipTLSVerify: document.getElementById('opnsenseSkipTLS').checked,
+    },
+    visionOne: {
+      region: document.getElementById('visionOneRegion').value,
+      apiToken: document.getElementById('visionOneAPIToken').value.trim(),
+      riskLevel: document.getElementById('visionOneRiskLevel').value,
+      daysToExpiration: parseInt(document.getElementById('visionOneDaysToExpiration').value, 10) || 0,
+      description: document.getElementById('visionOneDescription').value.trim(),
+      skipTLSVerify: document.getElementById('visionOneSkipTLS').checked,
     }
   };
 }
@@ -558,6 +580,7 @@ function updateAdvancedIntegrationFields() {
   document.getElementById('advancedMikrotikFields').classList.toggle('hidden', selected !== 'mikrotik');
   document.getElementById('advancedPfSenseFields').classList.toggle('hidden', selected !== 'pfsense');
   document.getElementById('advancedOPNsenseFields').classList.toggle('hidden', selected !== 'opnsense');
+  document.getElementById('advancedVisionOneFields').classList.toggle('hidden', selected !== 'visionone');
 }
 
 // =========================================================================

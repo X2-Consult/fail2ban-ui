@@ -24,10 +24,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
 )
 
@@ -37,10 +39,39 @@ import (
 
 var (
 	db          *sql.DB
+	dbDriver    string // "sqlite" or "postgres"
 	initOnce    sync.Once
 	initErr     error
 	defaultPath = "fail2ban-ui.db"
 )
+
+// rebind converts SQLite-style ? placeholders to PostgreSQL-style $N placeholders.
+// It is a no-op for any driver other than postgres.
+func rebind(query string) string {
+	if dbDriver != "postgres" {
+		return query
+	}
+	var buf strings.Builder
+	n := 1
+	for i := 0; i < len(query); i++ {
+		if query[i] == '?' {
+			buf.WriteByte('$')
+			buf.WriteString(strconv.Itoa(n))
+			n++
+		} else {
+			buf.WriteByte(query[i])
+		}
+	}
+	return buf.String()
+}
+
+// isDuplicateColumnError returns true when the error indicates a column already
+// exists (SQLite: "duplicate column name", PostgreSQL: "already exists").
+func isDuplicateColumnError(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate column name") ||
+		strings.Contains(msg, "already exists")
+}
 
 // =========================================================================
 //  Conversion Helpers
@@ -171,36 +202,73 @@ type PermanentBlockRecord struct {
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
-// Initialize the database.
+// =========================================================================
+//  Initialisation
+// =========================================================================
+
+// Init initialises the database. The driver and connection are configured via
+// environment variables:
+//
+//   - DB_TYPE=postgres + DATABASE_URL=<dsn>  →  PostgreSQL
+//   - DB_TYPE=sqlite (default)               →  SQLite, dbPath used as file path
 func Init(dbPath string) error {
 	initOnce.Do(func() {
-		if dbPath == "" {
-			dbPath = defaultPath
-		}
-		if err := ensureDirectory(dbPath); err != nil {
-			initErr = err
-			return
-		}
+		dbType := strings.ToLower(strings.TrimSpace(os.Getenv("DB_TYPE")))
+		dbURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
 
-		if err := ensureSSHDirectory(); err != nil {
-			log.Printf("Warning: failed to ensure .ssh directory: %v", err)
+		if dbType == "postgres" || (dbURL != "" && dbType != "sqlite") {
+			dbDriver = "postgres"
+			if dbURL == "" {
+				initErr = errors.New("DATABASE_URL is required when DB_TYPE=postgres")
+				return
+			}
+			initErr = initPostgres(dbURL)
+		} else {
+			dbDriver = "sqlite"
+			if dbPath == "" {
+				dbPath = defaultPath
+			}
+			initErr = initSQLite(dbPath)
 		}
-
-		var err error
-		db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout=5000", dbPath))
-		if err != nil {
-			initErr = err
-			return
-		}
-
-		if err = db.Ping(); err != nil {
-			initErr = err
-			return
-		}
-
-		initErr = ensureSchema(context.Background())
 	})
 	return initErr
+}
+
+func initSQLite(dbPath string) error {
+	if err := ensureDirectory(dbPath); err != nil {
+		return err
+	}
+	if err := ensureSSHDirectory(); err != nil {
+		log.Printf("Warning: failed to ensure .ssh directory: %v", err)
+	}
+	var err error
+	db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout=5000", dbPath))
+	if err != nil {
+		return err
+	}
+	if err = db.Ping(); err != nil {
+		return err
+	}
+	return ensureSchema(context.Background())
+}
+
+func initPostgres(dsn string) error {
+	if err := ensureSSHDirectory(); err != nil {
+		log.Printf("Warning: failed to ensure .ssh directory: %v", err)
+	}
+	var err error
+	db, err = sql.Open("pgx", dsn)
+	if err != nil {
+		return err
+	}
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	if err = db.Ping(); err != nil {
+		return err
+	}
+	log.Println("Storage: connected to PostgreSQL")
+	return ensureSchema(context.Background())
 }
 
 // Close the database.
@@ -210,6 +278,10 @@ func Close() error {
 	}
 	return db.Close()
 }
+
+// =========================================================================
+//  App Settings
+// =========================================================================
 
 // Get the app settings.
 func GetAppSettings(ctx context.Context) (AppSettingsRecord, bool, error) {
@@ -284,7 +356,7 @@ func SaveAppSettings(ctx context.Context, rec AppSettingsRecord) error {
 	if db == nil {
 		return errors.New("storage not initialised")
 	}
-	_, err := db.ExecContext(ctx, `
+	_, err := db.ExecContext(ctx, rebind(`
 INSERT INTO app_settings (
 	id, language, port, debug, restart_needed, callback_url, callback_secret, alert_countries, email_alerts_for_bans, email_alerts_for_unbans, smtp_host, smtp_port, smtp_username, smtp_password, smtp_from, smtp_use_tls, bantime_increment, default_jail_enable, ignore_ip, bantime, findtime, maxretry, destemail, banaction, banaction_allports, advanced_actions, geoip_provider, geoip_database_path, max_log_lines, console_output, smtp_insecure_skip_verify, smtp_auth_method, chain, bantime_rndtime, alert_provider, webhook, elasticsearch, threat_intel
 ) VALUES (
@@ -327,7 +399,7 @@ INSERT INTO app_settings (
 	webhook = excluded.webhook,
 	elasticsearch = excluded.elasticsearch,
 	threat_intel = excluded.threat_intel
-`, rec.Language,
+`), rec.Language,
 		rec.Port,
 		boolToInt(rec.Debug),
 		boolToInt(rec.RestartNeeded),
@@ -469,12 +541,12 @@ func ReplaceServers(ctx context.Context, servers []ServerRecord) error {
 		return err
 	}
 
-	stmt, err := tx.PrepareContext(ctx, `
+	stmt, err := tx.PrepareContext(ctx, rebind(`
 INSERT INTO servers (
 	id, name, type, host, port, socket_path, config_path, ssh_user, ssh_key_path, agent_url, agent_secret, hostname, tags, is_default, enabled, needs_restart, created_at, updated_at
 ) VALUES (
 	?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-)`)
+)`))
 	if err != nil {
 		return err
 	}
@@ -521,7 +593,7 @@ func DeleteServer(ctx context.Context, id string) error {
 	if db == nil {
 		return errors.New("storage not initialised")
 	}
-	_, err := db.ExecContext(ctx, `DELETE FROM servers WHERE id = ?`, id)
+	_, err := db.ExecContext(ctx, rebind(`DELETE FROM servers WHERE id = ?`), id)
 	return err
 }
 
@@ -551,10 +623,10 @@ func RecordBanEvent(ctx context.Context, record BanEventRecord) error {
 		eventType = "ban"
 	}
 
-	const query = `
+	query := rebind(`
 INSERT INTO ban_events (
 	server_id, server_name, jail, ip, country, hostname, failures, whois, logs, event_type, occurred_at, created_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 
 	_, err := db.ExecContext(
 		ctx,
@@ -572,11 +644,7 @@ INSERT INTO ban_events (
 		record.OccurredAt.UTC(),
 		record.CreatedAt.UTC(),
 	)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Returns ban events ordered by creation date descending.
@@ -607,7 +675,7 @@ WHERE 1=1`
 	baseQuery += " ORDER BY occurred_at DESC LIMIT ?"
 	args = append(args, limit)
 
-	rows, err := db.QueryContext(ctx, baseQuery, args...)
+	rows, err := db.QueryContext(ctx, rebind(baseQuery), args...)
 	if err != nil {
 		return nil, err
 	}
@@ -700,7 +768,7 @@ WHERE 1=1`
 	baseQuery += " ORDER BY occurred_at DESC LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
 
-	rows, err := db.QueryContext(ctx, baseQuery, args...)
+	rows, err := db.QueryContext(ctx, rebind(baseQuery), args...)
 	if err != nil {
 		return nil, err
 	}
@@ -772,7 +840,7 @@ func CountBanEventsFiltered(ctx context.Context, serverID string, since time.Tim
 	}
 
 	var total int64
-	if err := db.QueryRowContext(ctx, query, args...).Scan(&total); err != nil {
+	if err := db.QueryRowContext(ctx, rebind(query), args...).Scan(&total); err != nil {
 		return 0, err
 	}
 	return total, nil
@@ -785,7 +853,7 @@ func CountBanEventsByServer(ctx context.Context, since time.Time) (map[string]in
 	}
 
 	query := `
-SELECT server_id, COUNT(*) 
+SELECT server_id, COUNT(*)
 FROM ban_events
 WHERE 1=1`
 	args := []any{}
@@ -797,7 +865,7 @@ WHERE 1=1`
 
 	query += " GROUP BY server_id"
 
-	rows, err := db.QueryContext(ctx, query, args...)
+	rows, err := db.QueryContext(ctx, rebind(query), args...)
 	if err != nil {
 		return nil, err
 	}
@@ -839,7 +907,7 @@ WHERE 1=1`
 	}
 
 	var total int64
-	if err := db.QueryRowContext(ctx, query, args...).Scan(&total); err != nil {
+	if err := db.QueryRowContext(ctx, rebind(query), args...).Scan(&total); err != nil {
 		return 0, err
 	}
 	return total, nil
@@ -866,7 +934,7 @@ WHERE ip = ? AND (event_type = 'ban' OR event_type IS NULL)`
 	}
 
 	var total int64
-	if err := db.QueryRowContext(ctx, query, args...).Scan(&total); err != nil {
+	if err := db.QueryRowContext(ctx, rebind(query), args...).Scan(&total); err != nil {
 		return 0, err
 	}
 	return total, nil
@@ -896,7 +964,7 @@ WHERE 1=1`
 
 	query += " GROUP BY COALESCE(country, '')"
 
-	rows, err := db.QueryContext(ctx, query, args...)
+	rows, err := db.QueryContext(ctx, rebind(query), args...)
 	if err != nil {
 		return nil, err
 	}
@@ -960,15 +1028,17 @@ WHERE ip != '' AND (event_type = 'ban' OR event_type IS NULL)`
 		args = append(args, since.UTC())
 	}
 
+	// Use COUNT(*) in HAVING rather than the alias — PostgreSQL does not allow
+	// referencing SELECT aliases in HAVING clauses.
 	query += `
 GROUP BY ip, COALESCE(country, '')
-HAVING cnt >= ?
+HAVING COUNT(*) >= ?
 ORDER BY cnt DESC, last_seen DESC
 LIMIT ?`
 
 	args = append(args, minCount, limit)
 
-	rows, err := db.QueryContext(ctx, query, args...)
+	rows, err := db.QueryContext(ctx, rebind(query), args...)
 	if err != nil {
 		return nil, err
 	}
@@ -977,38 +1047,51 @@ LIMIT ?`
 	var results []RecurringIPStat
 	for rows.Next() {
 		var stat RecurringIPStat
-		var lastSeenStr sql.NullString
-		if err := rows.Scan(&stat.IP, &stat.Country, &stat.Count, &lastSeenStr); err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
+		var scanErr error
+
+		if dbDriver == "postgres" {
+			// PostgreSQL returns TIMESTAMPTZ natively; scan directly into sql.NullTime.
+			var lastSeen sql.NullTime
+			scanErr = rows.Scan(&stat.IP, &stat.Country, &stat.Count, &lastSeen)
+			if scanErr == nil && lastSeen.Valid {
+				stat.LastSeen = lastSeen.Time.UTC()
+			}
+		} else {
+			// SQLite returns DATETIME as a string with a non-standard format; parse manually.
+			var lastSeenStr sql.NullString
+			scanErr = rows.Scan(&stat.IP, &stat.Country, &stat.Count, &lastSeenStr)
+			if scanErr == nil && lastSeenStr.Valid && lastSeenStr.String != "" {
+				formats := []string{
+					"2006-01-02 15:04:05.999999999 -0700 MST",
+					time.RFC3339Nano,
+					time.RFC3339,
+					"2006-01-02 15:04:05.999999999+00:00",
+					"2006-01-02 15:04:05+00:00",
+					"2006-01-02 15:04:05.999999999",
+					"2006-01-02 15:04:05",
+					"2006-01-02T15:04:05.999999999Z",
+					"2006-01-02T15:04:05Z",
+					"2006-01-02T15:04:05.999999999",
+					"2006-01-02T15:04:05",
+				}
+				parsed := time.Time{}
+				for _, format := range formats {
+					if t, parseErr := time.Parse(format, lastSeenStr.String); parseErr == nil {
+						parsed = t.UTC()
+						break
+					}
+				}
+				if parsed.IsZero() {
+					log.Printf("ERROR: Could not parse lastSeen datetime '%s' (length: %d) for IP %s. All format attempts failed.", lastSeenStr.String, len(lastSeenStr.String), stat.IP)
+				}
+				stat.LastSeen = parsed
+			} else if scanErr == nil {
+				log.Printf("WARNING: lastSeen is NULL or empty for IP %s", stat.IP)
+			}
 		}
 
-		if lastSeenStr.Valid && lastSeenStr.String != "" {
-			formats := []string{
-				"2006-01-02 15:04:05.999999999 -0700 MST",
-				time.RFC3339Nano,
-				time.RFC3339,
-				"2006-01-02 15:04:05.999999999+00:00",
-				"2006-01-02 15:04:05+00:00",
-				"2006-01-02 15:04:05.999999999",
-				"2006-01-02 15:04:05",
-				"2006-01-02T15:04:05.999999999Z",
-				"2006-01-02T15:04:05Z",
-				"2006-01-02T15:04:05.999999999",
-				"2006-01-02T15:04:05",
-			}
-			parsed := time.Time{}
-			for _, format := range formats {
-				if t, parseErr := time.Parse(format, lastSeenStr.String); parseErr == nil {
-					parsed = t.UTC()
-					break
-				}
-			}
-			if parsed.IsZero() {
-				log.Printf("ERROR: Could not parse lastSeen datetime '%s' (length: %d) for IP %s. All format attempts failed.", lastSeenStr.String, len(lastSeenStr.String), stat.IP)
-			}
-			stat.LastSeen = parsed
-		} else {
-			log.Printf("WARNING: lastSeen is NULL or empty for IP %s", stat.IP)
+		if scanErr != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", scanErr)
 		}
 		results = append(results, stat)
 	}
@@ -1024,7 +1107,13 @@ func ensureSchema(ctx context.Context) error {
 	if db == nil {
 		return errors.New("storage not initialised")
 	}
+	if dbDriver == "postgres" {
+		return ensureSchemaPostgres(ctx)
+	}
+	return ensureSchemaSQLite(ctx)
+}
 
+func ensureSchemaSQLite(ctx context.Context) error {
 	const createTable = `
 CREATE TABLE IF NOT EXISTS app_settings (
 	id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -1126,55 +1215,132 @@ CREATE INDEX IF NOT EXISTS idx_perm_blocks_status ON permanent_blocks(status);
 	if _, err := db.ExecContext(ctx, createTable); err != nil {
 		return err
 	}
-	if _, err := db.ExecContext(ctx, `ALTER TABLE app_settings ADD COLUMN console_output INTEGER DEFAULT 0`); err != nil {
-		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+
+	migrations := []string{
+		`ALTER TABLE app_settings ADD COLUMN console_output INTEGER DEFAULT 0`,
+		`ALTER TABLE app_settings ADD COLUMN smtp_insecure_skip_verify INTEGER DEFAULT 0`,
+		`ALTER TABLE app_settings ADD COLUMN smtp_auth_method TEXT DEFAULT 'auto'`,
+		`ALTER TABLE app_settings ADD COLUMN chain TEXT DEFAULT 'INPUT'`,
+		`ALTER TABLE app_settings ADD COLUMN bantime_rndtime TEXT DEFAULT ''`,
+		`ALTER TABLE app_settings ADD COLUMN alert_provider TEXT DEFAULT 'email'`,
+		`ALTER TABLE app_settings ADD COLUMN webhook TEXT DEFAULT '{}'`,
+		`ALTER TABLE app_settings ADD COLUMN elasticsearch TEXT DEFAULT '{}'`,
+		`ALTER TABLE app_settings ADD COLUMN threat_intel TEXT DEFAULT '{}'`,
+		`ALTER TABLE servers ADD COLUMN config_path TEXT`,
+	}
+	for _, m := range migrations {
+		if _, err := db.ExecContext(ctx, m); err != nil && !isDuplicateColumnError(err) {
 			return err
 		}
 	}
-	if _, err := db.ExecContext(ctx, `ALTER TABLE app_settings ADD COLUMN smtp_insecure_skip_verify INTEGER DEFAULT 0`); err != nil {
-		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
-			return err
-		}
-	}
-	if _, err := db.ExecContext(ctx, `ALTER TABLE app_settings ADD COLUMN smtp_auth_method TEXT DEFAULT 'auto'`); err != nil {
-		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
-			return err
-		}
-	}
-	if _, err := db.ExecContext(ctx, `ALTER TABLE app_settings ADD COLUMN chain TEXT DEFAULT 'INPUT'`); err != nil {
-		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
-			return err
-		}
-	}
-	if _, err := db.ExecContext(ctx, `ALTER TABLE app_settings ADD COLUMN bantime_rndtime TEXT DEFAULT ''`); err != nil {
-		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
-			return err
-		}
-	}
-	if _, err := db.ExecContext(ctx, `ALTER TABLE app_settings ADD COLUMN alert_provider TEXT DEFAULT 'email'`); err != nil {
-		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
-			return err
-		}
-	}
-	if _, err := db.ExecContext(ctx, `ALTER TABLE app_settings ADD COLUMN webhook TEXT DEFAULT '{}'`); err != nil {
-		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
-			return err
-		}
-	}
-	if _, err := db.ExecContext(ctx, `ALTER TABLE app_settings ADD COLUMN elasticsearch TEXT DEFAULT '{}'`); err != nil {
-		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
-			return err
-		}
-	}
-	if _, err := db.ExecContext(ctx, `ALTER TABLE app_settings ADD COLUMN threat_intel TEXT DEFAULT '{}'`); err != nil {
-		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
-			return err
-		}
-	}
-	if _, err := db.ExecContext(ctx, `ALTER TABLE servers ADD COLUMN config_path TEXT`); err != nil {
-		if !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
-			return err
-		}
+	return nil
+}
+
+// ensureSchemaPostgres creates all tables and indexes for PostgreSQL.
+// All columns are defined upfront so no ALTER TABLE migrations are needed
+// for fresh installs. For existing databases, migrations are applied safely.
+func ensureSchemaPostgres(ctx context.Context) error {
+	const createTable = `
+CREATE TABLE IF NOT EXISTS app_settings (
+	id INTEGER PRIMARY KEY CHECK (id = 1),
+	language TEXT,
+	port INTEGER,
+	debug INTEGER,
+	restart_needed INTEGER,
+	callback_url TEXT,
+	callback_secret TEXT,
+	alert_countries TEXT,
+	email_alerts_for_bans INTEGER DEFAULT 1,
+	email_alerts_for_unbans INTEGER DEFAULT 0,
+	smtp_host TEXT,
+	smtp_port INTEGER,
+	smtp_username TEXT,
+	smtp_password TEXT,
+	smtp_from TEXT,
+	smtp_use_tls INTEGER,
+	bantime_increment INTEGER,
+	default_jail_enable INTEGER,
+	ignore_ip TEXT,
+	bantime TEXT,
+	findtime TEXT,
+	maxretry INTEGER,
+	destemail TEXT,
+	banaction TEXT,
+	banaction_allports TEXT,
+	advanced_actions TEXT,
+	geoip_provider TEXT,
+	geoip_database_path TEXT,
+	max_log_lines INTEGER,
+	console_output INTEGER DEFAULT 0,
+	smtp_insecure_skip_verify INTEGER DEFAULT 0,
+	smtp_auth_method TEXT DEFAULT 'auto',
+	chain TEXT DEFAULT 'INPUT',
+	bantime_rndtime TEXT DEFAULT '',
+	alert_provider TEXT DEFAULT 'email',
+	webhook TEXT DEFAULT '{}',
+	elasticsearch TEXT DEFAULT '{}',
+	threat_intel TEXT DEFAULT '{}'
+);
+
+CREATE TABLE IF NOT EXISTS servers (
+	id TEXT PRIMARY KEY,
+	name TEXT,
+	type TEXT,
+	host TEXT,
+	port INTEGER,
+	socket_path TEXT,
+	config_path TEXT,
+	ssh_user TEXT,
+	ssh_key_path TEXT,
+	agent_url TEXT,
+	agent_secret TEXT,
+	hostname TEXT,
+	tags TEXT,
+	is_default INTEGER,
+	enabled INTEGER,
+	needs_restart INTEGER DEFAULT 0,
+	created_at TEXT,
+	updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS ban_events (
+	id BIGSERIAL PRIMARY KEY,
+	server_id TEXT NOT NULL,
+	server_name TEXT NOT NULL,
+	jail TEXT NOT NULL,
+	ip TEXT NOT NULL,
+	country TEXT,
+	hostname TEXT,
+	failures TEXT,
+	whois TEXT,
+	logs TEXT,
+	event_type TEXT NOT NULL DEFAULT 'ban',
+	occurred_at TIMESTAMPTZ NOT NULL,
+	created_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ban_events_server_id ON ban_events(server_id);
+CREATE INDEX IF NOT EXISTS idx_ban_events_occurred_at ON ban_events(occurred_at);
+CREATE INDEX IF NOT EXISTS idx_ban_events_ip ON ban_events(ip);
+
+CREATE TABLE IF NOT EXISTS permanent_blocks (
+	id BIGSERIAL PRIMARY KEY,
+	ip TEXT NOT NULL,
+	integration TEXT NOT NULL,
+	status TEXT NOT NULL,
+	details TEXT,
+	message TEXT,
+	server_id TEXT,
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL,
+	UNIQUE(ip, integration)
+);
+
+CREATE INDEX IF NOT EXISTS idx_perm_blocks_status ON permanent_blocks(status);
+`
+
+	if _, err := db.ExecContext(ctx, createTable); err != nil {
+		return err
 	}
 	return nil
 }
@@ -1231,7 +1397,7 @@ func UpsertPermanentBlock(ctx context.Context, rec PermanentBlockRecord) error {
 		rec.Status = "blocked"
 	}
 
-	const query = `
+	query := rebind(`
 INSERT INTO permanent_blocks (ip, integration, status, details, message, server_id, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(ip, integration) DO UPDATE SET
@@ -1239,7 +1405,7 @@ ON CONFLICT(ip, integration) DO UPDATE SET
 	details = excluded.details,
 	message = excluded.message,
 	server_id = excluded.server_id,
-	updated_at = excluded.updated_at`
+	updated_at = excluded.updated_at`)
 
 	_, err := db.ExecContext(ctx, query,
 		rec.IP,
@@ -1263,10 +1429,10 @@ func GetPermanentBlock(ctx context.Context, ip, integration string) (PermanentBl
 		return PermanentBlockRecord{}, false, errors.New("ip and integration are required")
 	}
 
-	row := db.QueryRowContext(ctx, `
+	row := db.QueryRowContext(ctx, rebind(`
 SELECT id, ip, integration, status, details, message, server_id, created_at, updated_at
 FROM permanent_blocks
-WHERE ip = ? AND integration = ?`, ip, integration)
+WHERE ip = ? AND integration = ?`), ip, integration)
 
 	var rec PermanentBlockRecord
 	var createdAt, updatedAt sql.NullString
@@ -1298,11 +1464,11 @@ func ListPermanentBlocks(ctx context.Context, limit int) ([]PermanentBlockRecord
 		limit = 100
 	}
 
-	rows, err := db.QueryContext(ctx, `
+	rows, err := db.QueryContext(ctx, rebind(`
 SELECT id, ip, integration, status, details, message, server_id, created_at, updated_at
 FROM permanent_blocks
 ORDER BY updated_at DESC
-LIMIT ?`, limit)
+LIMIT ?`), limit)
 	if err != nil {
 		return nil, err
 	}

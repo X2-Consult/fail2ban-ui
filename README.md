@@ -29,7 +29,7 @@ Fail2Ban UI does not replace Fail2Ban. It connects to existing Fail2Ban instance
 - Remote jail/filter configuration management (connector-dependent)
 - Filter debug and live log-pattern testing
 - Ban insights with an interactive 3D globe by country
-- Advanced recurring-offender actions (MikroTik, pfSense, OPNsense)
+- Advanced recurring-offender actions (MikroTik, pfSense, OPNsense, Trend Micro Vision One)
 - Persistent event and permanent-block data management
 - Configurable alerts (Email/SMTP, Webhook, Elasticsearch) with GeoIP/Whois enrichment
 - Optional OIDC login (Keycloak, Authentik, Pocket-ID)
@@ -79,6 +79,7 @@ Next steps:
 * API reference: [`docs/api.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/api.md)
 * Alert providers (Email, Webhook, Elasticsearch): [`docs/alert-providers.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/alert-providers.md)
 * Threat intelligence (AlienVault OTX / AbuseIPDB): [`docs/threat-intel.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/threat-intel.md)
+* Advanced action integrations (Mikrotik, pfSense, OPNsense, Vision One): [`docs/integrations.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/integrations.md)
 * Troubleshooting: [`docs/troubleshooting.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/troubleshooting.md)
 
 Existing deployment guides in this repository:
@@ -165,7 +166,7 @@ When enabled the Debug console  showing real-time application logs, system messa
 
 #### Advanced Ban Actions
 ![Advanced Ban Actions](screenshots/4.2_Settings_AdvancedBanActions.png)
-Configuration for advanced ban actions including permanent blocking, firewall integrations (Mikrotik, pfSense, OPNsense), and threshold settings for recurring offenders.
+Configuration for advanced ban actions including permanent blocking, firewall integrations (Mikrotik, pfSense, OPNsense, Trend Micro Vision One), and threshold settings for recurring offenders.
 
 #### Alert Settings
 ![Alert Settings](screenshots/4.3_Settings_AlertSettings.png)
