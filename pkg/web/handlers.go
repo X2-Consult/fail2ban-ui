@@ -1021,6 +1021,57 @@ func TestServerHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// Deploys the ui-custom-action.conf and ensures jail.local references it for a given server.
+func DeployActionHandler(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing id parameter"})
+		return
+	}
+	server, ok := config.GetServerByID(id)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "server not found"})
+		return
+	}
+	if !server.Enabled {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "enable the server before deploying the action script", "messageKey": "servers.actions.deploy_not_enabled"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	switch server.Type {
+	case "local":
+		if err := config.EnsureLocalFail2banAction(server); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "messageKey": "servers.actions.deploy_failure"})
+			return
+		}
+		conn := fail2ban.NewLocalConnector(server)
+		if err := conn.EnsureJailLocalStructure(ctx); err != nil {
+			log.Printf("Warning: could not update jail.local for local server %s: %v", server.Name, err)
+		}
+
+	case "ssh":
+		if err := fail2ban.GetManager().UpdateActionFileForServer(ctx, id); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to deploy action file: " + err.Error(), "messageKey": "servers.actions.deploy_failure"})
+			return
+		}
+		if conn, err := fail2ban.GetManager().Connector(id); err == nil {
+			if err := conn.EnsureJailLocalStructure(ctx); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update jail.local: " + err.Error(), "messageKey": "servers.actions.deploy_failure"})
+				return
+			}
+		}
+
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "action script deployment not supported for server type: " + server.Type})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"messageKey": "servers.actions.deploy_success"})
+}
+
 func waitForConnectorReady(ctx context.Context, conn fail2ban.Connector, attempts int, delay time.Duration) bool {
 	if attempts < 1 {
 		attempts = 1

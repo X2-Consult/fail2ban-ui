@@ -188,6 +188,7 @@ function renderServerManagerList() {
         ? '<button class="text-sm text-blue-600 hover:text-blue-800 relative group" onclick="restartFail2banServer(\'' + escapeHtml(server.id) + '\')" data-i18n="servers.actions.reload" title="" data-i18n-title="servers.actions.reload_tooltip">Reload Fail2ban</button>'
         : '<button class="text-sm text-blue-600 hover:text-blue-800" onclick="restartFail2banServer(\'' + escapeHtml(server.id) + '\')" data-i18n="servers.actions.restart">Restart Fail2ban</button>') : '')
       + '      <button class="text-sm text-blue-600 hover:text-blue-800" onclick="testServerConnection(\'' + escapeHtml(server.id) + '\')" data-i18n="servers.actions.test">Test connection</button>'
+      + (server.enabled && server.type !== 'agent' ? '      <button class="text-sm text-blue-600 hover:text-blue-800" onclick="deployActionScript(\'' + escapeHtml(server.id) + '\')" data-i18n="servers.actions.deploy_action">Deploy action script</button>' : '')
       + '      <button class="text-sm text-red-600 hover:text-red-800" onclick="deleteServer(\'' + escapeHtml(server.id) + '\')" data-i18n="servers.actions.delete">Delete</button>'
       + '    </div>'
       + '  </div>'
@@ -666,6 +667,28 @@ function testServerConnection(serverId) {
     })
     .catch(function(err) {
       showToast(t('servers.actions.test_failure', 'Connection failed') + ': ' + err, 'error');
+    })
+    .finally(function() {
+      showLoading(false);
+    });
+}
+
+function deployActionScript(serverId) {
+  if (!serverId) return;
+  showLoading(true);
+  fetch(appPath('/api/servers/' + encodeURIComponent(serverId) + '/deploy-action'), {
+    method: 'POST'
+  })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.error) {
+        showToast(t(data.messageKey || 'servers.actions.deploy_failure', data.error), 'error');
+        return;
+      }
+      showToast(t(data.messageKey || 'servers.actions.deploy_success', 'Action script deployed successfully. Reload Fail2ban to apply.'), 'success', 8000);
+    })
+    .catch(function(err) {
+      showToast(t('servers.actions.deploy_failure', 'Failed to deploy action script') + ': ' + err, 'error');
     })
     .finally(function() {
       showLoading(false);

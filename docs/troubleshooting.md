@@ -301,6 +301,81 @@ Why is that set:
 
 So the symptom "unban works but the UI only records unbans for *new* blocks" matches **`norestored = 1`** plus a restart between the original ban and the unban.
 
+## Vision One not receiving bans
+
+Vision One is called by Fail2ban-UI after a ban is received — it is not called directly by Fail2ban. If IPs are not appearing in Vision One's Suspicious Objects list, work through these checks in order.
+
+### Check 1: Advanced Actions is enabled and configured
+
+Go to **Settings → Advanced Actions** and confirm:
+
+- The **Enabled** toggle is **on** — if it is off, nothing will be sent regardless of other settings.
+- **Integration** is set to `Trend Micro Vision One`.
+- The **API Token** contains a real token, not a placeholder like `Fail2ban UI API Key`.
+- The **Region** matches your Vision One tenant (check the domain you use to log in).
+- The **Threshold** is set to a value the IP has actually reached. If threshold is `5` and the IP has only been banned twice, Vision One will not be called yet.
+
+### Check 2: Fail2ban-UI is receiving ban callbacks
+
+Vision One can only be called if Fail2ban-UI first receives a ban notification from Fail2ban. Check the service logs for incoming `POST /api/ban` requests:
+
+```bash
+journalctl -u fail2ban-ui.service --no-pager -n 200 | grep "POST.*api/ban"
+```
+
+If there are no results, Fail2ban is not sending callbacks to Fail2ban-UI. The action script is either not deployed or Fail2ban has not been reloaded since it was deployed. Continue with Check 3.
+
+### Check 3: The action script is deployed and Fail2ban has been reloaded
+
+The action script (`/etc/fail2ban/action.d/ui-custom-action.conf`) must exist on the **Fail2ban host** and Fail2ban must have been reloaded after it was written.
+
+**Deploy via the UI:** Go to **Settings → Manage Servers**, find the server, and click **Deploy action script**. If it fails with a permission error, see the SSH permissions note in the [Vision One setup guide](integrations.md).
+
+**After deploying, reload Fail2ban on the Fail2ban host** — Fail2ban-UI does not need to be restarted:
+
+```bash
+sudo systemctl reload fail2ban
+```
+
+Verify the file is in place and points to your callback URL:
+
+```bash
+cat /etc/fail2ban/action.d/ui-custom-action.conf | grep -E "actionban|CALLBACK"
+```
+
+Also confirm `jail.local` references the action:
+
+```bash
+grep "ui-custom-action" /etc/fail2ban/jail.local
+```
+
+If `jail.local` is user-managed and does not contain `ui-custom-action`, you must add the reference manually — see the [Vision One setup guide](integrations.md).
+
+### Check 4: Vision One API calls in the logs
+
+Enable **Debug mode** in **Settings → General**, then trigger a ban that meets the threshold. Check the logs for Vision One output:
+
+```bash
+journalctl -u fail2ban-ui.service --no-pager -n 100 | grep -i "vision"
+```
+
+You should see lines like:
+
+```
+Vision One API POST https://api.au.xdr.trendmicro.com/v3.0/threatintel/suspiciousObjects payload=[...]
+Vision One: IP 1.2.3.4 added to Suspicious Objects list (region: au)
+```
+
+If you see an error line instead, it will contain the HTTP status and response body from the Vision One API — use that to diagnose the issue (wrong region, invalid token, insufficient API scope, etc.).
+
+Without debug mode, successful Vision One calls are silent. Only failures are logged.
+
+### Check 5: The IP may already be blocked
+
+Fail2ban-UI only sends an IP to Vision One once — if it is already recorded as permanently blocked, subsequent bans for that IP do not re-trigger the API call. Check the block history in **Settings → Advanced Actions → Block History** to see whether the IP has already been processed and what the recorded status was.
+
+---
+
 ## Alert provider issues
 
 ### Alerts not being sent (any provider)

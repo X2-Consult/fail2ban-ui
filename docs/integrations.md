@@ -121,10 +121,29 @@ In OPNsense, go to **Firewall → Aliases**, add an alias of type **Host(s)** (e
 
 Adds blocked IPs to Trend Micro Vision One's **Suspicious Objects** list via the Vision One v3 API. Vision One then automatically applies detection/block actions across endpoints, email gateways, and network sensors enrolled in your tenant.
 
+### How it works
+
+Vision One is **not** called directly by Fail2ban. The full chain is:
+
+```
+Fail2ban (ban event)
+  → action script on the Fail2ban host fires a curl callback
+    → Fail2ban-UI receives POST /api/ban
+      → Fail2ban-UI evaluates the threshold
+        → Fail2ban-UI calls the Vision One API
+```
+
+The action script's only job is to notify Fail2ban-UI that a ban occurred. Fail2ban-UI holds the Vision One API token and makes the API call. This means:
+
+- The action script must be deployed to **every Fail2ban host** you want covered.
+- Fail2ban-UI must be reachable from those hosts at the configured callback URL.
+- Vision One is only contacted **after the ban count for an IP reaches the configured threshold** — it does not fire on every ban.
+
 ### Prerequisites
 
 - An active Trend Micro Vision One tenant
 - An API key with **Threat Intelligence** write permission (specifically the `Suspicious Object Management` API scope)
+- The Fail2ban action script deployed and Fail2ban reloaded on every managed host (see Step 5 below)
 
 ### Step-by-step setup
 
@@ -151,23 +170,72 @@ Go to **Settings → Advanced Actions**, select **Trend Micro Vision One**, and 
 
 | Field | Description |
 |---|---|
+| Enabled | Must be toggled **on** — the integration does nothing when disabled |
 | Region | Your tenant's region code (see table above) |
 | API Token | The token generated in step 1 |
+| Threshold | Number of times an IP must be banned before Vision One is called. `1` = every ban triggers it; `5` = only repeat offenders. |
 | Risk Level | Severity assigned to each blocked IP: `high`, `medium`, or `low`. Defaults to `high`. |
 | Days to Expiration | How many days until Vision One automatically removes the entry. Set to `0` for no expiry. |
-| Description | Label stored with each Suspicious Object entry (e.g. `Blocked by Fail2ban-UI`) |
+| Description | Label stored with each Suspicious Object entry (e.g. `Blocked by Fail2ban`) |
 | Skip TLS Verification | Disable certificate check — leave unchecked in production |
 
-**4. Save and verify**
+**4. Save settings**
 
-Click **Save**. Trigger a manual ban from the Fail2Ban UI dashboard. In Vision One, go to **Threat Intelligence → Suspicious Object Management** and confirm the IP appears in the list.
+Click **Save**. The integration will not fire until the action script is also deployed (next step).
 
-**Behaviour notes:**
+**5. Deploy the action script to each Fail2ban host**
 
+The action script is a small conf file that Fail2ban runs on every ban/unban to notify Fail2ban-UI. It must exist on the **Fail2ban host**, not on the Fail2ban-UI host.
+
+Go to **Settings → Manage Servers**, find the server you want to cover, and click **Deploy action script**. Fail2ban-UI will:
+
+1. Write `/etc/fail2ban/action.d/ui-custom-action.conf` on that host (via SSH for remote servers, directly for local servers)
+2. Write `/etc/fail2ban/jail.local` to reference the action (skipped if a user-managed `jail.local` already exists — see note below)
+
+After deploying, **reload Fail2ban on that host** to pick up the changes — Fail2ban-UI does not need to be restarted:
+
+```bash
+sudo systemctl reload fail2ban
+# or, if reload is not supported:
+sudo systemctl restart fail2ban
+```
+
+> **SSH server permission requirement:** The SSH user configured for the server must have write access to `/etc/fail2ban/action.d/` and `/etc/fail2ban/jail.local` on the remote host. If the deploy fails with a permission error, run the following on the remote host:
+> ```bash
+> sudo chown root:<ssh-user-group> /etc/fail2ban/action.d
+> sudo chmod g+w /etc/fail2ban/action.d
+> sudo chown root:<ssh-user-group> /etc/fail2ban/jail.local
+> sudo chmod g+w /etc/fail2ban/jail.local
+> ```
+
+> **User-managed jail.local:** If `/etc/fail2ban/jail.local` already exists and was not created by Fail2ban-UI, it will not be overwritten. You must manually add the following to the `[DEFAULT]` section and reload Fail2ban:
+> ```ini
+> action_mwlg = %(action_)s
+>              ui-custom-action[logpath="%(logpath)s", chain="%(chain)s"]
+> action = %(action_mwlg)s
+> ```
+
+**6. Verify end-to-end**
+
+Trigger a test ban that will meet the configured threshold. In Vision One, go to **Threat Intelligence → Suspicious Object Management** and confirm the IP appears.
+
+To see Vision One API calls in the Fail2ban-UI logs, enable **Debug mode** in **Settings → General**. You will then see log lines like:
+
+```
+Vision One API POST https://api.au.xdr.trendmicro.com/v3.0/threatintel/suspiciousObjects payload=[...]
+Vision One: IP 1.2.3.4 added to Suspicious Objects list (region: au)
+```
+
+Without debug mode, Vision One calls are silent in the logs unless they fail.
+
+### Behaviour notes
+
+- Vision One is only called once per IP per integration — if the IP is already permanently blocked, subsequent bans do not re-send it.
 - Bans → IP added via `POST /v3.0/threatintel/suspiciousObjects`
 - Unbans → IP removed via `DELETE /v3.0/threatintel/suspiciousObjects`
-- If the IP already exists in the list when a ban fires, Vision One returns `409 Conflict` — the integration treats this as success (no duplicate error)
-- The Vision One API returns HTTP 207 Multi-Status; per-item errors are checked and surfaced as failures
+- If the IP already exists in the list when a ban fires, Vision One returns `409 Conflict` — the integration treats this as success (no duplicate error).
+- The Vision One API returns HTTP 207 Multi-Status; per-item errors are checked and surfaced as failures.
+- The block history (including errors) is visible in **Settings → Advanced Actions → Block History**.
 
 ### API reference
 

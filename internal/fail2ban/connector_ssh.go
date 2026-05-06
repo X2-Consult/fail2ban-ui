@@ -23,6 +23,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -83,7 +84,7 @@ func NewSSHConnector(server shared.Fail2banServer) (Connector, error) {
 	defer cancel()
 
 	if err := conn.ensureAction(ctx); err != nil {
-		debugf("warning: failed to ensure remote fail2ban action for %s during startup (server may not be ready): %v", server.Name, err)
+		log.Printf("⚠️ Failed to deploy action script to %s during startup: %v", server.Name, err)
 	}
 	return conn, nil
 }

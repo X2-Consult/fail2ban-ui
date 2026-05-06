@@ -91,6 +91,15 @@ else
     success "Go: $(go version)"
 fi
 
+# jq + curl (required by the fail2ban action script)
+for _tool in jq curl; do
+    if ! command -v "$_tool" &>/dev/null; then
+        info "Installing $_tool..."
+        apt-get install -y "$_tool"
+    fi
+    success "$_tool: $(command -v $_tool)"
+done
+
 # Node / npm
 if ! command -v node &>/dev/null || ! command -v npm &>/dev/null; then
     warn "Node.js / npm not found."
@@ -278,6 +287,104 @@ INSTALL_DIR=$INSTALL_DIR
 SERVICE_USER=$SERVICE_USER
 EOF
 chmod 600 "$INSTALL_CONF"
+
+# ─── Step 11: Fail2ban action script (local fail2ban only) ──────────────────
+echo ""
+echo -e "${BOLD}── Fail2ban action script ────────────────────────────────────${NC}"
+
+if command -v fail2ban-server &>/dev/null && [[ -d /etc/fail2ban ]]; then
+    ACTION_DIR="/etc/fail2ban/action.d"
+    ACTION_FILE="$ACTION_DIR/ui-custom-action.conf"
+    JAIL_LOCAL="/etc/fail2ban/jail.local"
+    mkdir -p "$ACTION_DIR"
+
+    info "Writing $ACTION_FILE..."
+    cat > "$ACTION_FILE" <<ACTIONEOF
+[Definition]
+
+# Bypasses ban/unban for restored bans
+norestored = 1
+
+# Executes a cURL request to notify our API when an IP is banned.
+actionban = /usr/bin/curl -X POST ${CALLBACK_URL}/api/ban \\
+     -H "Content-Type: application/json" \\
+     -H "X-Callback-Secret: ${CALLBACK_SECRET}" \\
+     -d "\$(jq -n --arg serverId 'local' \\
+                 --arg ip '<ip>' \\
+                 --arg jail '<name>' \\
+                 --arg hostname '<fq-hostname>' \\
+                 --arg failures '<failures>' \\
+                 --arg logs "\$(tac <logpath> | grep <grepopts> -wF <ip>)" \\
+                 '{serverId: \$serverId, ip: \$ip, jail: \$jail, hostname: \$hostname, failures: \$failures, logs: \$logs}')"
+
+# Executes a cURL request to notify our API when an IP is unbanned.
+actionunban = /usr/bin/curl -X POST ${CALLBACK_URL}/api/unban \\
+     -H "Content-Type: application/json" \\
+     -H "X-Callback-Secret: ${CALLBACK_SECRET}" \\
+     -d "\$(jq -n --arg serverId 'local' \\
+                 --arg ip '<ip>' \\
+                 --arg jail '<name>' \\
+                 --arg hostname '<fq-hostname>' \\
+                 '{serverId: \$serverId, ip: \$ip, jail: \$jail, hostname: \$hostname}')"
+
+[Init]
+
+# Default name of the chain
+name = default
+
+# Path to log files containing relevant lines for the abuser IP
+logpath = /dev/null
+
+# Number of log lines to include in the callback
+grepmax = 200
+grepopts = -m <grepmax>
+ACTIONEOF
+    success "Action file written."
+
+    # Only write jail.local if it doesn't exist or is already UI-managed
+    if [[ ! -f "$JAIL_LOCAL" ]] || grep -q "ui-custom-action" "$JAIL_LOCAL" 2>/dev/null; then
+        info "Writing $JAIL_LOCAL..."
+        cat > "$JAIL_LOCAL" <<'JAILEOF'
+# Fail2ban-UI managed jail.local — do not edit this block manually.
+[DEFAULT]
+bantime.increment = false
+ignoreip = 127.0.0.1/8 ::1
+bantime = 10m
+findtime = 10m
+maxretry = 5
+banaction = nftables-multiport
+banaction_allports = nftables-allports
+chain = INPUT
+
+# Custom Fail2Ban action for UI callbacks
+action_mwlg = %(action_)s
+             ui-custom-action[logpath="%(logpath)s", chain="%(chain)s"]
+
+# Custom Fail2Ban action applied by fail2ban-ui
+action = %(action_mwlg)s
+JAILEOF
+        success "jail.local written."
+    else
+        warn "Existing user-managed jail.local detected — skipping overwrite."
+        warn "Add the following to your [DEFAULT] section manually:"
+        echo ""
+        echo -e "  ${CYAN}action_mwlg = %(action_)s${NC}"
+        echo -e "  ${CYAN}             ui-custom-action[logpath=\"%(logpath)s\", chain=\"%(chain)s\"]${NC}"
+        echo -e "  ${CYAN}action = %(action_mwlg)s${NC}"
+        echo ""
+    fi
+
+    if systemctl is-active --quiet fail2ban 2>/dev/null; then
+        info "Reloading Fail2ban to pick up the new action..."
+        systemctl reload fail2ban 2>/dev/null || systemctl restart fail2ban 2>/dev/null
+        success "Fail2ban reloaded."
+    else
+        warn "Fail2ban is not running — start it with: systemctl start fail2ban"
+    fi
+else
+    warn "Fail2ban not found on this host — skipping action script setup."
+    info "If fail2ban runs on a remote host, use the 'Deploy action script' button in the UI after adding that server via SSH."
+fi
 
 # ─── Done ───────────────────────────────────────────────────────────────────
 echo ""
