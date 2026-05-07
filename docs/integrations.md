@@ -149,7 +149,23 @@ The action script's only job is to notify Fail2ban-UI that a ban occurred. Fail2
 
 **1. Generate an API key**
 
-Log into Vision One and navigate to **Administration → API Keys**. Click **Add API Key**, give it a descriptive name (e.g. `fail2ban-ui`), set the role to **Master Administrator** or a custom role that includes the `Suspicious Object Management` scope with write access. Copy the token — it is shown only once.
+Log into Vision One and navigate to **Administration → API Keys**. Click **Add API Key**, give it a descriptive name (e.g. `fail2ban-ui`), and assign a **custom role** with the minimum permissions below. Copy the token — it is shown only once.
+
+> **Do not use Master Administrator for this key.** A least-privilege custom role is safer and sufficient.
+
+**Minimum required permissions for the custom role:**
+
+| Category | Permission | Notes |
+|---|---|---|
+| **Threat Intelligence** | | |
+| → Suspicious Object Management | View, Filter and Search | Required — used to read the list |
+| → Suspicious Object Management | View Object in Sandbox Analysis | For future use |
+| → Suspicious Object Management | Manage Lists and Configure Settings | Required — used to add/remove IPs |
+| **Sandbox Analysis** | | |
+| → Sandbox Analysis | View, Filter and Search | For future use |
+| → Sandbox Analysis | Submit Object | For future use |
+
+To create the custom role: go to **Administration → User Roles**, click **Add Role**, configure the permissions above, save, then assign the role when generating the API key.
 
 **2. Identify your region**
 
