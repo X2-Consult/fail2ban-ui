@@ -68,6 +68,14 @@ func main() {
 			log.Fatalf("failed to initialize OIDC: %v", err)
 		}
 		log.Println("OIDC authentication enabled")
+	} else {
+		log.Println("⚠️  ══════════════════════════════════════════════════════════════")
+		log.Println("⚠️  SECURITY WARNING: Authentication is NOT configured.")
+		log.Println("⚠️  All API endpoints and the web UI are publicly accessible.")
+		log.Println("⚠️  Set OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET,")
+		log.Println("⚠️  and OIDC_REDIRECT_URL to enable authentication.")
+		log.Println("⚠️  Do NOT expose this service on the internet without auth.")
+		log.Println("⚠️  ══════════════════════════════════════════════════════════════")
 	}
 
 	// Set Gin mode

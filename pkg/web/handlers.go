@@ -208,6 +208,10 @@ func BanIPHandler(c *gin.Context) {
 	jail := c.Param("jail")
 	ip := c.Param("ip")
 
+	if err := fail2ban.ValidateJailName(jail); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid jail name: " + err.Error()})
+		return
+	}
 	if err := integrations.ValidateIP(ip); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -236,6 +240,10 @@ func UnbanIPHandler(c *gin.Context) {
 	jail := c.Param("jail")
 	ip := c.Param("ip")
 
+	if err := fail2ban.ValidateJailName(jail); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid jail name: " + err.Error()})
+		return
+	}
 	if err := integrations.ValidateIP(ip); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -274,21 +282,9 @@ func BanNotificationHandler(c *gin.Context) {
 	}
 
 	// Logs the raw JSON body of the request
-	body, _ := io.ReadAll(c.Request.Body)
-	log.Printf("----------------------------------------------------")
-	log.Printf("Request Content-Length: %d", c.Request.ContentLength)
-	log.Printf("Request Headers: %v", c.Request.Header)
-	log.Printf("Request Headers: %v", c.Request.Body)
-
-	log.Printf("----------------------------------------------------")
-
+	body, _ := io.ReadAll(io.LimitReader(c.Request.Body, 1<<20))
 	config.DebugLog("Incoming ban notification: %s\n", string(body))
-
 	c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
-
-	log.Printf("Request Content-Length: %d", c.Request.ContentLength)
-	log.Printf("Request Headers: %v", c.Request.Header)
-	log.Printf("Request Headers: %v", c.Request.Body)
 
 	if err := c.ShouldBindJSON(&request); err != nil {
 		var verr validator.ValidationErrors
@@ -342,9 +338,8 @@ func UnbanNotificationHandler(c *gin.Context) {
 		Hostname string `json:"hostname"`
 	}
 
-	body, _ := io.ReadAll(c.Request.Body)
+	body, _ := io.ReadAll(io.LimitReader(c.Request.Body, 1<<20))
 	config.DebugLog("Incoming unban notification: %s\n", string(body))
-
 	c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
 
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -2600,7 +2595,63 @@ func GetSettingsHandler(c *gin.Context) {
 		response["callbackUrl"] = envCallbackURL
 	}
 
+	maskSettingsSecrets(response)
 	c.JSON(http.StatusOK, response)
+}
+
+const secretMask = "••••••••"
+
+// maskSettingsSecrets replaces sensitive credential fields with a placeholder.
+// The UI uses the masked value as a signal that a secret is set; it sends the
+// placeholder back unchanged on save, and the save handler preserves the
+// existing DB value when it sees the mask.
+func maskSettingsSecrets(r map[string]interface{}) {
+	maskStr := func(m map[string]interface{}, key string) {
+		if v, ok := m[key].(string); ok && v != "" {
+			m[key] = secretMask
+		}
+	}
+	maskStr(r, "callbackSecret")
+
+	if smtp, ok := r["smtp"].(map[string]interface{}); ok {
+		maskStr(smtp, "password")
+	}
+	if es, ok := r["elasticsearch"].(map[string]interface{}); ok {
+		maskStr(es, "apiKey")
+		maskStr(es, "password")
+	}
+	if aa, ok := r["advancedActions"].(map[string]interface{}); ok {
+		if mt, ok := aa["mikrotik"].(map[string]interface{}); ok {
+			maskStr(mt, "password")
+		}
+		if pf, ok := aa["pfsense"].(map[string]interface{}); ok {
+			maskStr(pf, "apiToken")
+			maskStr(pf, "apiSecret")
+		}
+		if opn, ok := aa["opnsense"].(map[string]interface{}); ok {
+			maskStr(opn, "apiKey")
+			maskStr(opn, "apiSecret")
+		}
+		if v1, ok := aa["visionone"].(map[string]interface{}); ok {
+			maskStr(v1, "apiToken")
+		}
+	}
+	if oidc, ok := r["oidc"].(map[string]interface{}); ok {
+		maskStr(oidc, "clientSecret")
+		maskStr(oidc, "sessionSecret")
+	}
+	if ti, ok := r["threatIntel"].(map[string]interface{}); ok {
+		maskStr(ti, "alienVaultApiKey")
+		maskStr(ti, "abuseIpDbApiKey")
+	}
+	if servers, ok := r["servers"].([]interface{}); ok {
+		for _, srv := range servers {
+			if s, ok := srv.(map[string]interface{}); ok {
+				maskStr(s, "agentSecret")
+				maskStr(s, "password")
+			}
+		}
+	}
 }
 
 // Saves new settings, pushes defaults to servers, and reloads.
@@ -2647,7 +2698,26 @@ func UpdateSettingsHandler(c *gin.Context) {
 		return
 	}
 
+	// Preserve existing secrets when the UI sends back the mask placeholder.
 	oldSettings := config.GetSettings()
+	preserveIfMasked := func(incoming, existing string) string {
+		if incoming == secretMask {
+			return existing
+		}
+		return incoming
+	}
+	req.CallbackSecret = preserveIfMasked(req.CallbackSecret, oldSettings.CallbackSecret)
+	req.SMTP.Password = preserveIfMasked(req.SMTP.Password, oldSettings.SMTP.Password)
+	req.AdvancedActions.Mikrotik.Password = preserveIfMasked(req.AdvancedActions.Mikrotik.Password, oldSettings.AdvancedActions.Mikrotik.Password)
+	req.AdvancedActions.PfSense.APIToken = preserveIfMasked(req.AdvancedActions.PfSense.APIToken, oldSettings.AdvancedActions.PfSense.APIToken)
+	req.AdvancedActions.PfSense.APISecret = preserveIfMasked(req.AdvancedActions.PfSense.APISecret, oldSettings.AdvancedActions.PfSense.APISecret)
+	req.AdvancedActions.OPNsense.APIKey = preserveIfMasked(req.AdvancedActions.OPNsense.APIKey, oldSettings.AdvancedActions.OPNsense.APIKey)
+	req.AdvancedActions.OPNsense.APISecret = preserveIfMasked(req.AdvancedActions.OPNsense.APISecret, oldSettings.AdvancedActions.OPNsense.APISecret)
+	req.AdvancedActions.VisionOne.APIToken = preserveIfMasked(req.AdvancedActions.VisionOne.APIToken, oldSettings.AdvancedActions.VisionOne.APIToken)
+	req.Elasticsearch.APIKey = preserveIfMasked(req.Elasticsearch.APIKey, oldSettings.Elasticsearch.APIKey)
+	req.ThreatIntel.AlienVaultAPIKey = preserveIfMasked(req.ThreatIntel.AlienVaultAPIKey, oldSettings.ThreatIntel.AlienVaultAPIKey)
+	req.ThreatIntel.AbuseIPDBAPIKey = preserveIfMasked(req.ThreatIntel.AbuseIPDBAPIKey, oldSettings.ThreatIntel.AbuseIPDBAPIKey)
+
 	newSettings, err := config.UpdateSettings(req)
 	if err != nil {
 		fmt.Println("Error updating settings:", err)
@@ -2803,6 +2873,10 @@ func GetFilterContentHandler(c *gin.Context) {
 	config.DebugLog("----------------------------")
 	config.DebugLog("GetFilterContentHandler called (handlers.go)")
 	filterName := c.Param("filter")
+	if err := fail2ban.ValidateFilterName(filterName); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid filter name: " + err.Error()})
+		return
+	}
 	conn, err := resolveConnector(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

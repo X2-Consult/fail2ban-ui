@@ -20,7 +20,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -1060,8 +1062,7 @@ func (sc *SSHConnector) TestFilter(ctx context.Context, filterName string, logLi
 	localPath := filepath.Join(fail2banPath, "filter.d", filterName+".local")
 	confPath := filepath.Join(fail2banPath, "filter.d", filterName+".conf")
 
-	const heredocMarker = "F2B_FILTER_TEST_LOG"
-	const filterContentMarker = "F2B_FILTER_CONTENT"
+	heredocMarker := randomHeredocMarker()
 	logContent := strings.Join(cleaned, "\n")
 
 	var script string
@@ -1630,4 +1631,15 @@ func parseJailConfigContent(content string) []JailInfo {
 		})
 	}
 	return jails
+}
+
+// randomHeredocMarker generates an unpredictable heredoc delimiter so that
+// user-supplied log lines cannot break out of the heredoc shell construct.
+func randomHeredocMarker() string {
+	b := make([]byte, 12)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback: use a long static marker that is extremely unlikely in logs.
+		return "F2B_EOF_7f3a9c2e1b0d4f6a8e5c3b2a1d0f9e8c"
+	}
+	return "F2B_EOF_" + hex.EncodeToString(b)
 }
