@@ -80,6 +80,34 @@ Recommended minimum sudoers for SSH connector accounts:
 Notes:
 - Fail2Ban UI executes the commands for fail2ban with `sudo` over SSH. Because of that the NOPASSWD option is very important.
 
+### Required filesystem permissions for SSH connector accounts
+
+The SSH user needs write access to two locations on the remote host so Fail2ban-UI can deploy the action script and manage `jail.local`:
+
+| Path | Purpose |
+|---|---|
+| `/etc/fail2ban/action.d/` | Write `ui-custom-action.conf` |
+| `/etc/fail2ban/` (directory) | Create `jail.local` when it does not exist |
+| `/etc/fail2ban/jail.local` | Update `jail.local` when it already exists |
+
+Run the following on the **remote host** to grant the correct permissions:
+
+```bash
+# Allow the SSH user to write into action.d/
+sudo chown root:<ssh-user> /etc/fail2ban/action.d
+sudo chmod g+w /etc/fail2ban/action.d
+
+# Allow the SSH user to create jail.local (write access to the directory)
+sudo chown root:<ssh-user> /etc/fail2ban
+sudo chmod g+w /etc/fail2ban
+
+# If jail.local already exists, also grant write access to the file itself
+sudo chown root:<ssh-user> /etc/fail2ban/jail.local
+sudo chmod g+w /etc/fail2ban/jail.local
+```
+
+After fixing permissions, click **Deploy action script** again from **Settings → Manage Servers** and then reload Fail2ban on the remote host.
+
 
 ## Ban/unban notifications not showing up in the UI
 
@@ -101,17 +129,70 @@ If the file does not exist or looks wrong, go to Settings → Manage Servers in 
 
 ### Step 2: Verify jail.local references the action
 
-Fail2ban-UI writes a `jail.local` that uses the custom action. Check that it is in place:
+Fail2ban-UI writes a `jail.local` that includes the `ui-custom-action` reference in the `[DEFAULT]` section. Without this, Fail2ban will never call the action script and no callbacks will reach the UI.
 
 ```bash
-cat /etc/fail2ban/jail.local | head -30
-
-# Look for the lines like:
-# action = %(action_mwlg)s
-# and a definition of action_mwlg that references ui-custom-action
+grep "ui-custom-action" /etc/fail2ban/jail.local
+# Should return at least one line. If it returns nothing, see below.
 ```
 
-If your `jail.local` was created manually or by another tool, the `ui-custom-action` might not be referenced. The easiest fix: let the UI manage `jail.local` by removing your manual version and restarting from the UI.
+The UI shows a **"jail.local is not managed by Fail2ban-UI"** warning banner on the server card when this reference is missing. There are three causes, each with a different fix:
+
+---
+
+**Cause A: `jail.local` does not exist and the SSH user cannot create it**
+
+The SSH user needs write access to the `/etc/fail2ban/` directory to create new files in it. If the file is missing and the **Deploy action script** button returns no error but the warning persists, the write silently failed due to directory permissions.
+
+Fix on the remote host:
+
+```bash
+sudo chown root:<ssh-user> /etc/fail2ban
+sudo chmod g+w /etc/fail2ban
+```
+
+Then click **Deploy action script** again in the UI, followed by:
+
+```bash
+sudo systemctl reload fail2ban
+```
+
+---
+
+**Cause B: `jail.local` does not exist and you want to fix it manually**
+
+Create the file with the minimum required content:
+
+```bash
+sudo tee /etc/fail2ban/jail.local << 'EOF'
+[DEFAULT]
+action_mwlg = %(action_)s
+             ui-custom-action[logpath="%(logpath)s", chain="%(chain)s"]
+action = %(action_mwlg)s
+EOF
+
+sudo systemctl reload fail2ban
+```
+
+---
+
+**Cause C: `jail.local` exists but was created by you or another tool**
+
+Fail2ban-UI will not overwrite a user-managed `jail.local`. Add the following lines into the `[DEFAULT]` section of your existing file:
+
+```ini
+action_mwlg = %(action_)s
+             ui-custom-action[logpath="%(logpath)s", chain="%(chain)s"]
+action = %(action_mwlg)s
+```
+
+Then reload Fail2ban:
+
+```bash
+sudo systemctl reload fail2ban
+```
+
+Alternatively, move each jail section into its own file under `/etc/fail2ban/jail.d/` and delete `jail.local` — Fail2ban-UI will then create and manage the file automatically on the next deploy or settings save.
 
 ### Step 3: Check network connectivity from Fail2Ban host to the UI
 
