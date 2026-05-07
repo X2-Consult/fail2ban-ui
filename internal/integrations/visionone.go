@@ -76,8 +76,8 @@ func (v *visionOneIntegration) UnblockIP(req Request) error {
 // =========================================================================
 
 type soObject struct {
-	Type             string `json:"type"`
-	Value            string `json:"value"`
+	IP               string `json:"ip"`
+	ScanAction       string `json:"scanAction,omitempty"`
 	RiskLevel        string `json:"riskLevel,omitempty"`
 	Description      string `json:"description,omitempty"`
 	DaysToExpiration int    `json:"daysToExpiration,omitempty"`
@@ -112,8 +112,8 @@ func (v *visionOneIntegration) modifySuspiciousObject(req Request, add bool) err
 	var payload []soObject
 	if add {
 		obj := soObject{
-			Type:        "ip",
-			Value:       req.IP,
+			IP:          req.IP,
+			ScanAction:  "block",
 			RiskLevel:   riskLevel,
 			Description: description,
 		}
@@ -122,7 +122,7 @@ func (v *visionOneIntegration) modifySuspiciousObject(req Request, add bool) err
 		}
 		payload = []soObject{obj}
 	} else {
-		payload = []soObject{{Type: "ip", Value: req.IP}}
+		payload = []soObject{{IP: req.IP}}
 	}
 
 	body, err := json.Marshal(payload)
@@ -144,8 +144,7 @@ func (v *visionOneIntegration) modifySuspiciousObject(req Request, add bool) err
 		return fmt.Errorf("visionone: failed to create request: %w", err)
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+cfg.APIToken)
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("TMV1-Query", "type:ip")
+	httpReq.Header.Set("Content-Type", "application/json;charset=utf-8")
 
 	resp, err := client.Do(httpReq)
 	if err != nil {
@@ -154,6 +153,10 @@ func (v *visionOneIntegration) modifySuspiciousObject(req Request, add bool) err
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
+
+	if req.Logger != nil {
+		req.Logger("Vision One API response: status=%s body=%s", resp.Status, strings.TrimSpace(string(respBody)))
+	}
 
 	// Vision One returns 207 Multi-Status for both add and delete.
 	// 201 Created is also acceptable for add.
@@ -167,7 +170,7 @@ func (v *visionOneIntegration) modifySuspiciousObject(req Request, add bool) err
 		for _, item := range items {
 			// 409 Conflict on add means IP already exists — not an error.
 			if item.Status >= 400 && !(add && item.Status == 409) {
-				return fmt.Errorf("visionone: per-item error status %d for IP %s", item.Status, req.IP)
+				return fmt.Errorf("visionone: per-item error status %d for IP %s — response: %s", item.Status, req.IP, strings.TrimSpace(string(respBody)))
 			}
 		}
 	}
