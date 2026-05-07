@@ -79,6 +79,35 @@ func isPublicRoute(path string) bool {
 	return false
 }
 
+// CSRFProtection rejects unsafe mutating requests from cross-site origins.
+// Browser API calls must include X-Requested-With: XMLHttpRequest (set by serverHeaders()).
+// Public routes (ban/unban callbacks, auth endpoints) are exempt — they rely on
+// X-Callback-Secret or are genuinely public.
+func CSRFProtection() gin.HandlerFunc {
+	safeMethods := map[string]bool{
+		"GET":     true,
+		"HEAD":    true,
+		"OPTIONS": true,
+	}
+	return func(c *gin.Context) {
+		if safeMethods[c.Request.Method] {
+			c.Next()
+			return
+		}
+		if isPublicRoute(c.Request.URL.Path) {
+			c.Next()
+			return
+		}
+		if c.GetHeader("X-Requested-With") != "XMLHttpRequest" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error": "CSRF check failed — missing X-Requested-With header",
+			})
+			return
+		}
+		c.Next()
+	}
+}
+
 // Checks if the request is an API request
 func isAPIRequest(c *gin.Context) bool {
 	accept := c.GetHeader("Accept")

@@ -32,9 +32,10 @@ function withServerParam(url) {
   return url + (url.indexOf('?') === -1 ? '?' : '&') + 'serverId=' + encodeURIComponent(currentServerId);
 }
 
-// Adds the server ID to the headers if a server is selected.
+// Adds the server ID and CSRF token to the headers if a server is selected.
 function serverHeaders(headers) {
   headers = headers || {};
+  headers['X-Requested-With'] = 'XMLHttpRequest';
   if (currentServerId) {
     headers['X-F2B-Server'] = currentServerId;
   }

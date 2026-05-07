@@ -411,12 +411,18 @@ func (sc *SSHConnector) buildSSHArgs(command []string) []string {
 		"-o", "ServerAliveInterval=5",
 		"-o", "ServerAliveCountMax=2",
 	)
-	if _, container := os.LookupEnv("CONTAINER"); container {
+	// Use a persistent known_hosts file so TOFU (trust-on-first-use) works
+	// in container deployments. SSH_KNOWN_HOSTS overrides the path; if the
+	// env var is not set we fall back to the user's default known_hosts.
+	// StrictHostKeyChecking=accept-new trusts new hosts on first connect but
+	// rejects keys that change (unlike "no" which never verifies).
+	if knownHostsFile := sshKnownHostsPath(); knownHostsFile != "" {
 		args = append(args,
-			"-o", "StrictHostKeyChecking=no",
-			"-o", "UserKnownHostsFile=/dev/null",
-			"-o", "LogLevel=ERROR",
+			"-o", "StrictHostKeyChecking=accept-new",
+			"-o", fmt.Sprintf("UserKnownHostsFile=%s", knownHostsFile),
 		)
+	} else {
+		args = append(args, "-o", "StrictHostKeyChecking=accept-new")
 	}
 	controlPath := fmt.Sprintf("/tmp/ssh_control_%s_%s", sc.server.ID, strings.ReplaceAll(sc.server.Host, ".", "_"))
 	args = append(args,
@@ -1634,6 +1640,19 @@ func parseJailConfigContent(content string) []JailInfo {
 		})
 	}
 	return jails
+}
+
+// sshKnownHostsPath returns the path to the known_hosts file to use for SSH
+// connections. SSH_KNOWN_HOSTS env var overrides; falls back to ~/.ssh/known_hosts.
+func sshKnownHostsPath() string {
+	if p := os.Getenv("SSH_KNOWN_HOSTS"); p != "" {
+		return p
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".ssh", "known_hosts")
 }
 
 // randomHeredocMarker generates an unpredictable heredoc delimiter so that

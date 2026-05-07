@@ -35,6 +35,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/swissmakers/fail2ban-ui/internal/crypto"
 	"github.com/swissmakers/fail2ban-ui/internal/fail2ban"
 	"github.com/swissmakers/fail2ban-ui/internal/shared"
 	"github.com/swissmakers/fail2ban-ui/internal/storage"
@@ -111,12 +112,13 @@ type VisionOneIntegrationSettings struct {
 }
 
 type MikrotikIntegrationSettings struct {
-	Host        string `json:"host"`
-	Port        int    `json:"port"`
-	Username    string `json:"username"`
-	Password    string `json:"password"`
-	SSHKeyPath  string `json:"sshKeyPath"`
-	AddressList string `json:"addressList"`
+	Host            string `json:"host"`
+	Port            int    `json:"port"`
+	Username        string `json:"username"`
+	Password        string `json:"password"`
+	SSHKeyPath      string `json:"sshKeyPath"`
+	AddressList     string `json:"addressList"`
+	HostFingerprint string `json:"hostFingerprint,omitempty"`
 }
 
 type PfSenseIntegrationSettings struct {
@@ -381,6 +383,17 @@ func persistServersLocked() error {
 	return storage.ReplaceServers(backgroundCtx, records)
 }
 
+// decryptField decrypts a stored credential field; on error it returns the raw
+// value so the application can continue (the error is logged via DebugLog).
+func decryptField(s string) string {
+	v, err := crypto.Decrypt(s)
+	if err != nil {
+		DebugLog("credential decrypt warning: %v", err)
+		return s
+	}
+	return v
+}
+
 func applyAppSettingsRecordLocked(rec storage.AppSettingsRecord) {
 	currentSettings.Language = rec.Language
 	currentSettings.Port = rec.Port
@@ -410,7 +423,7 @@ func applyAppSettingsRecordLocked(rec storage.AppSettingsRecord) {
 		Host:               rec.SMTPHost,
 		Port:               rec.SMTPPort,
 		Username:           rec.SMTPUsername,
-		Password:           rec.SMTPPassword,
+		Password:           decryptField(rec.SMTPPassword),
 		From:               rec.SMTPFrom,
 		UseTLS:             rec.SMTPUseTLS,
 		InsecureSkipVerify: rec.SMTPInsecureSkipVerify,
@@ -424,14 +437,14 @@ func applyAppSettingsRecordLocked(rec storage.AppSettingsRecord) {
 	}
 	if rec.AdvancedActionsJSON != "" {
 		var adv AdvancedActionsConfig
-		if err := json.Unmarshal([]byte(rec.AdvancedActionsJSON), &adv); err == nil {
+		if err := json.Unmarshal([]byte(decryptField(rec.AdvancedActionsJSON)), &adv); err == nil {
 			currentSettings.AdvancedActions = adv
 		}
 	}
 	currentSettings.GeoIPProvider = rec.GeoIPProvider
 	currentSettings.GeoIPDatabasePath = rec.GeoIPDatabasePath
 	currentSettings.MaxLogLines = rec.MaxLogLines
-	currentSettings.CallbackSecret = rec.CallbackSecret
+	currentSettings.CallbackSecret = decryptField(rec.CallbackSecret)
 	currentSettings.EmailAlertsForBans = rec.EmailAlertsForBans
 	currentSettings.EmailAlertsForUnbans = rec.EmailAlertsForUnbans
 	if rec.AlertProvider != "" {
@@ -441,19 +454,19 @@ func applyAppSettingsRecordLocked(rec storage.AppSettingsRecord) {
 	}
 	if rec.WebhookJSON != "" {
 		var wh WebhookSettings
-		if err := json.Unmarshal([]byte(rec.WebhookJSON), &wh); err == nil {
+		if err := json.Unmarshal([]byte(decryptField(rec.WebhookJSON)), &wh); err == nil {
 			currentSettings.Webhook = wh
 		}
 	}
 	if rec.ElasticsearchJSON != "" {
 		var es ElasticsearchSettings
-		if err := json.Unmarshal([]byte(rec.ElasticsearchJSON), &es); err == nil {
+		if err := json.Unmarshal([]byte(decryptField(rec.ElasticsearchJSON)), &es); err == nil {
 			currentSettings.Elasticsearch = es
 		}
 	}
 	if rec.ThreatIntelJSON != "" {
 		var ti ThreatIntelSettings
-		if err := json.Unmarshal([]byte(rec.ThreatIntelJSON), &ti); err == nil {
+		if err := json.Unmarshal([]byte(decryptField(rec.ThreatIntelJSON)), &ti); err == nil {
 			currentSettings.ThreatIntel = ti
 		}
 	}
@@ -478,7 +491,7 @@ func applyServerRecordsLocked(records []storage.ServerRecord) {
 			SSHUser:       rec.SSHUser,
 			SSHKeyPath:    rec.SSHKeyPath,
 			AgentURL:      rec.AgentURL,
-			AgentSecret:   rec.AgentSecret,
+			AgentSecret:   decryptField(rec.AgentSecret),
 			Hostname:      rec.Hostname,
 			Tags:          tags,
 			IsDefault:     rec.IsDefault,
@@ -527,20 +540,29 @@ func toAppSettingsRecordLocked() (storage.AppSettingsRecord, error) {
 		alertProvider = "email"
 	}
 
+	encryptOrLog := func(s string) string {
+		v, err := crypto.Encrypt(s)
+		if err != nil {
+			DebugLog("credential encrypt warning: %v", err)
+			return s
+		}
+		return v
+	}
+
 	return storage.AppSettingsRecord{
 		Language:               currentSettings.Language,
 		Port:                   currentSettings.Port,
 		Debug:                  currentSettings.Debug,
 		RestartNeeded:          currentSettings.RestartNeeded,
 		CallbackURL:            currentSettings.CallbackURL,
-		CallbackSecret:         currentSettings.CallbackSecret,
+		CallbackSecret:         encryptOrLog(currentSettings.CallbackSecret),
 		AlertCountriesJSON:     string(countryBytes),
 		EmailAlertsForBans:     currentSettings.EmailAlertsForBans,
 		EmailAlertsForUnbans:   currentSettings.EmailAlertsForUnbans,
 		SMTPHost:               currentSettings.SMTP.Host,
 		SMTPPort:               currentSettings.SMTP.Port,
 		SMTPUsername:           currentSettings.SMTP.Username,
-		SMTPPassword:           currentSettings.SMTP.Password,
+		SMTPPassword:           encryptOrLog(currentSettings.SMTP.Password),
 		SMTPFrom:               currentSettings.SMTP.From,
 		SMTPUseTLS:             currentSettings.SMTP.UseTLS,
 		SMTPInsecureSkipVerify: currentSettings.SMTP.InsecureSkipVerify,
@@ -556,14 +578,14 @@ func toAppSettingsRecordLocked() (storage.AppSettingsRecord, error) {
 		BanactionAllports:      currentSettings.BanactionAllports,
 		Chain:                  currentSettings.Chain,
 		BantimeRndtime:         currentSettings.BantimeRndtime,
-		AdvancedActionsJSON:    string(advancedBytes),
+		AdvancedActionsJSON:    encryptOrLog(string(advancedBytes)),
 		GeoIPProvider:          currentSettings.GeoIPProvider,
 		GeoIPDatabasePath:      currentSettings.GeoIPDatabasePath,
 		MaxLogLines:            currentSettings.MaxLogLines,
 		AlertProvider:          alertProvider,
-		WebhookJSON:            string(webhookBytes),
-		ElasticsearchJSON:      string(esBytes),
-		ThreatIntelJSON:        string(threatIntelBytes),
+		WebhookJSON:            encryptOrLog(string(webhookBytes)),
+		ElasticsearchJSON:      encryptOrLog(string(esBytes)),
+		ThreatIntelJSON:        encryptOrLog(string(threatIntelBytes)),
 		ConsoleOutput:          currentSettings.ConsoleOutput,
 	}, nil
 }
@@ -587,6 +609,11 @@ func toServerRecordsLocked() ([]storage.ServerRecord, error) {
 		if updatedAt.IsZero() {
 			updatedAt = createdAt
 		}
+		agentSecretEnc, agentSecretErr := crypto.Encrypt(srv.AgentSecret)
+		if agentSecretErr != nil {
+			DebugLog("credential encrypt warning (agent secret): %v", agentSecretErr)
+			agentSecretEnc = srv.AgentSecret
+		}
 		records = append(records, storage.ServerRecord{
 			ID:           srv.ID,
 			Name:         srv.Name,
@@ -598,7 +625,7 @@ func toServerRecordsLocked() ([]storage.ServerRecord, error) {
 			SSHUser:      srv.SSHUser,
 			SSHKeyPath:   srv.SSHKeyPath,
 			AgentURL:     srv.AgentURL,
-			AgentSecret:  srv.AgentSecret,
+			AgentSecret:  agentSecretEnc,
 			Hostname:     srv.Hostname,
 			TagsJSON:     string(tagBytes),
 			IsDefault:    srv.IsDefault,
@@ -1557,4 +1584,13 @@ func updateConsoleLogState(enabled bool) {
 	if updateConsoleLogStateFunc != nil {
 		updateConsoleLogStateFunc(enabled)
 	}
+}
+
+// SetMikrotikHostFingerprint persists a newly learned SSH host key fingerprint for the
+// MikroTik integration without requiring a full settings round-trip.
+func SetMikrotikHostFingerprint(fp string) {
+	settingsLock.Lock()
+	defer settingsLock.Unlock()
+	currentSettings.AdvancedActions.Mikrotik.HostFingerprint = fp
+	_ = persistAppSettingsLocked()
 }

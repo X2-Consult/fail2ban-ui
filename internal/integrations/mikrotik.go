@@ -111,10 +111,25 @@ func (m *mikrotikIntegration) runCommand(req Request, command string) error {
 		port = 22
 	}
 
+	hostKeyCallback := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		got := ssh.FingerprintSHA256(key)
+		if cfg.HostFingerprint == "" {
+			if req.Logger != nil {
+				req.Logger("Mikrotik: trusting new host key %s for %s (TOFU — saved for future verification)", got, hostname)
+			}
+			config.SetMikrotikHostFingerprint(got)
+			return nil
+		}
+		if got != cfg.HostFingerprint {
+			return fmt.Errorf("mikrotik host key mismatch for %s: got %s, expected %s — possible MITM; clear HostFingerprint in settings to re-trust", hostname, got, cfg.HostFingerprint)
+		}
+		return nil
+	}
+
 	clientCfg := &ssh.ClientConfig{
 		User:            cfg.Username,
 		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: hostKeyCallback,
 		Timeout:         10 * time.Second,
 	}
 

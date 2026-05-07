@@ -698,7 +698,7 @@ function deployActionScript(serverId) {
 function deleteServer(serverId) {
   if (!confirm(t('servers.actions.delete_confirm', 'Delete this server entry?'))) return;
   showLoading(true);
-  fetch(appPath('/api/servers/' + encodeURIComponent(serverId)), { method: 'DELETE' })
+  fetch(appPath('/api/servers/' + encodeURIComponent(serverId)), { method: 'DELETE', headers: serverHeaders() })
     .then(function(res) { return res.json(); })
     .then(function(data) {
       if (data.error) {
@@ -728,7 +728,7 @@ function deleteServer(serverId) {
 
 function makeDefaultServer(serverId) {
   showLoading(true);
-  fetch(appPath('/api/servers/' + encodeURIComponent(serverId) + '/default'), { method: 'POST' })
+  fetch(appPath('/api/servers/' + encodeURIComponent(serverId) + '/default'), { method: 'POST', headers: serverHeaders() })
     .then(function(res) { return res.json(); })
     .then(function(data) {
       if (data.error) {

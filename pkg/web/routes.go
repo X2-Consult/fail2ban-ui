@@ -30,8 +30,8 @@ func RegisterRoutes(r *gin.Engine, hub *Hub) {
 	// Public routes; do not require authentication
 	authRoutes := r.Group("/auth")
 	{
-		authRoutes.GET("/login", LoginHandler)
-		authRoutes.GET("/callback", CallbackHandler)
+		authRoutes.GET("/login", RateLimitAuth(), LoginHandler)
+		authRoutes.GET("/callback", RateLimitAuth(), CallbackHandler)
 		authRoutes.GET("/logout", LogoutHandler)
 		authRoutes.GET("/status", AuthStatusHandler)
 		authRoutes.GET("/user", UserInfoHandler)
@@ -39,6 +39,7 @@ func RegisterRoutes(r *gin.Engine, hub *Hub) {
 
 	// Initialize authentication middleware; all routes below here require authentication
 	r.Use(AuthMiddleware())
+	r.Use(CSRFProtection())
 
 	// Dashboard at "/" internally; use BASE_PATH env && strip middleware for public subpaths
 	r.GET("/", renderIndexPage)
@@ -50,8 +51,8 @@ func RegisterRoutes(r *gin.Engine, hub *Hub) {
 		api.GET("/summary", SummaryHandler)
 
 		// External API calls from Fail2ban servers that notify Fail2Ban-UI backend about ban/unban events that where triggered.
-		api.POST("/ban", BanNotificationHandler)
-		api.POST("/unban", UnbanNotificationHandler)
+		api.POST("/ban", RateLimitCallback(), BanNotificationHandler)
+		api.POST("/unban", RateLimitCallback(), UnbanNotificationHandler)
 
 		// Internal API calls from frontend (e.g. manual actions) to backend to execute Ban / Unban
 		api.POST("/jails/:jail/unban/:ip", UnbanIPHandler)
