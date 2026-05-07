@@ -17,12 +17,16 @@ type visionOneIntegration struct{}
 
 // Vision One regional base URLs.
 var visionOneRegions = map[string]string{
-	"us": "https://api.xdr.trendmicro.com",
-	"eu": "https://api.eu.xdr.trendmicro.com",
-	"jp": "https://api.xdr.trendmicro.co.jp",
-	"sg": "https://api.sg.xdr.trendmicro.com",
-	"in": "https://api.in.xdr.trendmicro.com",
-	"au": "https://api.au.xdr.trendmicro.com",
+	"us":  "https://api.xdr.trendmicro.com",
+	"au":  "https://api.au.xdr.trendmicro.com",
+	"ca":  "https://api.ca.xdr.trendmicro.com",
+	"eu":  "https://api.eu.xdr.trendmicro.com",
+	"in":  "https://api.in.xdr.trendmicro.com",
+	"jp":  "https://api.xdr.trendmicro.co.jp",
+	"sg":  "https://api.sg.xdr.trendmicro.com",
+	"za":  "https://api.za.xdr.trendmicro.com",
+	"mea": "https://api.mea.xdr.trendmicro.com",
+	"uk":  "https://api.uk.xdr.trendmicro.com",
 }
 
 func init() {

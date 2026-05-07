@@ -171,14 +171,18 @@ To create the custom role: go to **Administration → User Roles**, click **Add 
 
 Your Vision One region matches the data residency of your tenant. Check the URL in your browser when logged into Vision One:
 
-| URL domain | Region code |
-|---|---|
-| `portal.xdr.trendmicro.com` | `us` |
-| `portal.eu.xdr.trendmicro.com` | `eu` |
-| `portal.xdr.trendmicro.co.jp` | `jp` |
-| `portal.sg.xdr.trendmicro.com` | `sg` |
-| `portal.in.xdr.trendmicro.com` | `in` |
-| `portal.au.xdr.trendmicro.com` | `au` |
+| Region | Portal URL | Region code | API endpoint |
+|---|---|---|---|
+| United States | `portal.xdr.trendmicro.com` | `us` | `api.xdr.trendmicro.com` |
+| Australia | `portal.au.xdr.trendmicro.com` | `au` | `api.au.xdr.trendmicro.com` |
+| Canada | `portal.ca.xdr.trendmicro.com` | `ca` | `api.ca.xdr.trendmicro.com` |
+| Germany (EU) | `portal.eu.xdr.trendmicro.com` | `eu` | `api.eu.xdr.trendmicro.com` |
+| India | `portal.in.xdr.trendmicro.com` | `in` | `api.in.xdr.trendmicro.com` |
+| Japan | `portal.xdr.trendmicro.co.jp` | `jp` | `api.xdr.trendmicro.co.jp` |
+| Singapore | `portal.sg.xdr.trendmicro.com` | `sg` | `api.sg.xdr.trendmicro.com` |
+| South Africa | `portal.za.xdr.trendmicro.com` | `za` | `api.za.xdr.trendmicro.com` |
+| United Arab Emirates | `portal.mea.xdr.trendmicro.com` | `mea` | `api.mea.xdr.trendmicro.com` |
+| United Kingdom | `portal.uk.xdr.trendmicro.com` | `uk` | `api.uk.xdr.trendmicro.com` |
 
 **3. Configure in Fail2Ban UI**
 
