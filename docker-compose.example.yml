@@ -6,6 +6,9 @@ services:
     # Alternative: Use Swissmakers registry (fallback)
     # image: registry.swissmakers.ch/infra/fail2ban-ui:latest
 
+    # Alternative: Use your own registry (GitHub Container Registry):
+    # image: ghcr.io/x2-consult/fail2ban-ui:latest
+
     # Or build from source (uncomment to use):
     # build:
     #   context: .

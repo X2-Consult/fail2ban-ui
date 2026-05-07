@@ -48,16 +48,43 @@ You can also run the development stacks under `development/` if you want to eval
 ### Option C: Build the image yourself
 
 ```bash
-git clone https://github.com/swissmakers/fail2ban-ui.git
+git clone https://github.com/X2-Consult/fail2ban-ui.git
 cd fail2ban-ui
-podman build -t fail2ban-ui:dev .
+podman build -t fail2ban-ui:local .
 podman run -d --name fail2ban-ui --network=host \
   -v /opt/fail2ban-ui:/config:Z \
   -v /etc/fail2ban:/etc/fail2ban:Z \
   -v /var/run/fail2ban:/var/run/fail2ban \
   -v /var/log:/var/log:ro \
-  localhost/fail2ban-ui:dev
+  localhost/fail2ban-ui:local
 ```
+
+The multi-arch build (amd64 + arm64) used by CI can be reproduced locally with BuildKit:
+
+```bash
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --tag ghcr.io/x2-consult/fail2ban-ui:local \
+  --load \
+  .
+```
+
+### Option D: CI-built image (GitHub Actions)
+
+Every push to `main` triggers `.github/workflows/build.yml`, which builds a multi-arch image and pushes it to GitHub Container Registry:
+
+```
+ghcr.io/x2-consult/fail2ban-ui:latest
+ghcr.io/x2-consult/fail2ban-ui:sha-<short-sha>
+```
+
+Use this in your compose file:
+
+```yaml
+image: ghcr.io/x2-consult/fail2ban-ui:latest
+```
+
+The workflow also pushes to Docker Hub when `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets are set.
 
 ## systemd deployment (standalone)
 
@@ -71,7 +98,7 @@ Additional resources:
 The bundled `install.sh` script handles all prerequisites, builds the binary, configures the database, and installs a systemd service in one guided session:
 
 ```bash
-git clone https://github.com/swissmakers/fail2ban-ui.git /opt/fail2ban-ui
+git clone https://github.com/X2-Consult/fail2ban-ui.git /opt/fail2ban-ui
 cd /opt/fail2ban-ui
 sudo ./install.sh
 ```
@@ -98,7 +125,7 @@ sudo /opt/fail2ban-ui/update.sh
 ### Option B: Manual build
 
 ```bash
-git clone https://github.com/swissmakers/fail2ban-ui.git /opt/fail2ban-ui
+git clone https://github.com/X2-Consult/fail2ban-ui.git /opt/fail2ban-ui
 cd /opt/fail2ban-ui
 
 # Build static CSS assets
