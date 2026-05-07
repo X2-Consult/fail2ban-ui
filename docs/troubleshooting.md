@@ -406,17 +406,19 @@ journalctl -u fail2ban-ui.service --no-pager -n 200 | grep "POST.*api/ban"
 
 If there are no results, Fail2ban is not sending callbacks to Fail2ban-UI. The action script is either not deployed or Fail2ban has not been reloaded since it was deployed. Continue with Check 3.
 
-### Check 3: The action script is deployed and Fail2ban has been reloaded
+### Check 3: The action script is deployed and Fail2ban has been restarted
 
-The action script (`/etc/fail2ban/action.d/ui-custom-action.conf`) must exist on the **Fail2ban host** and Fail2ban must have been reloaded after it was written.
+The action script (`/etc/fail2ban/action.d/ui-custom-action.conf`) must exist on the **Fail2ban host** and Fail2ban must have been **restarted** (not just reloaded) after it was first deployed.
 
 **Deploy via the UI:** Go to **Settings → Manage Servers**, find the server, and click **Deploy action script**. If it fails with a permission error, see the SSH permissions note in the [Vision One setup guide](integrations.md).
 
-**After deploying, reload Fail2ban on the Fail2ban host** — Fail2ban-UI does not need to be restarted:
+**After deploying, restart Fail2ban on the Fail2ban host** — Fail2ban-UI does not need to be restarted:
 
 ```bash
-sudo systemctl reload fail2ban
+sudo systemctl restart fail2ban
 ```
+
+> **Restart vs reload:** `systemctl reload fail2ban` is sufficient for config changes to existing jails, but `restart` is required when a brand-new action file is deployed for the first time. If callbacks still don't arrive after a reload, restart instead.
 
 Verify the file is in place and points to your callback URL:
 
@@ -432,7 +434,50 @@ grep "ui-custom-action" /etc/fail2ban/jail.local
 
 If `jail.local` is user-managed and does not contain `ui-custom-action`, you must add the reference manually — see the [Vision One setup guide](integrations.md).
 
-### Check 4: Vision One API calls in the logs
+### Check 4: Per-jail action override
+
+Even when `jail.local` correctly sets `ui-custom-action` in `[DEFAULT]`, a jail-specific `action =` line in any file under `/etc/fail2ban/jail.d/` will **completely override** the default for that jail. The callback will not fire for those jails.
+
+Detect overrides on the Fail2ban host:
+
+```bash
+grep -rn "^\s*action\s*=" /etc/fail2ban/jail.d/
+```
+
+Any result means that jail bypasses `[DEFAULT]`. For each affected jail, add a second `action =` line **inside** the `[<jailname>]` section of that file:
+
+```ini
+[your-jail-name]
+# existing settings...
+action = %(action_)s
+         ui-custom-action[logpath="%(logpath)s", chain="%(chain)s"]
+```
+
+Then restart Fail2ban:
+
+```bash
+sudo systemctl restart fail2ban
+```
+
+### Check 5: Callback URL reachable from the Fail2ban host
+
+The `curl` in the action script must be able to reach the Fail2ban-UI callback URL from the Fail2ban host. Test it directly on that host:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" https://your-fail2ban-ui-domain/api/version
+# Expected: 200
+```
+
+Common causes of failure:
+
+- **DNS hairpin NAT**: If Fail2ban-UI is behind a reverse proxy on the same internal network as the Fail2ban host, the public hostname may not resolve to the internal IP. Add a manual entry to `/etc/hosts` on the Fail2ban host:
+  ```
+  10.x.x.x   your-fail2ban-ui-domain
+  ```
+- **Firewall**: The UI host firewall may block inbound connections from the Fail2ban host's IP.
+- **Container bridge networking**: If Fail2ban-UI runs in a container with bridge networking and the callback URL points to `127.0.0.1`, the container cannot reach the host. Use the host's real IP or `--network=host`.
+
+### Check 6: Vision One API calls in the logs
 
 Enable **Debug mode** in **Settings → General**, then trigger a ban that meets the threshold. Check the logs for Vision One output:
 
@@ -444,16 +489,26 @@ You should see lines like:
 
 ```
 Vision One API POST https://api.au.xdr.trendmicro.com/v3.0/threatintel/suspiciousObjects payload=[...]
+Vision One API response: status=207 Multi-Status body=[{"status":201,...}]
 Vision One: IP 1.2.3.4 added to Suspicious Objects list (region: au)
 ```
 
-If you see an error line instead, it will contain the HTTP status and response body from the Vision One API — use that to diagnose the issue (wrong region, invalid token, insufficient API scope, etc.).
+If you see an error line instead, it includes the HTTP status and the full Vision One response body. Common per-item error codes:
 
-Without debug mode, successful Vision One calls are silent. Only failures are logged.
+| Error code | Meaning | Fix |
+|---|---|---|
+| `4000007` | Parameter validation failed — payload format rejected | Ensure you are running the latest version of Fail2ban-UI |
+| `400` (token) | Invalid or expired API token | Regenerate the token in Vision One → Administration → API Keys |
+| `403` | Insufficient API scope | Ensure the key has `Suspicious Object Management` write access |
+| `401` | Token rejected | Check the token has not been rotated or revoked |
 
-### Check 5: The IP may already be blocked
+Without debug mode, successful Vision One calls are silent. Only failures are logged always.
+
+### Check 7: The IP may already be blocked
 
 Fail2ban-UI only sends an IP to Vision One once — if it is already recorded as permanently blocked, subsequent bans for that IP do not re-trigger the API call. Check the block history in **Settings → Advanced Actions → Block History** to see whether the IP has already been processed and what the recorded status was.
+
+If the status shows `error` (a previous attempt failed), the next ban event for that IP will retry automatically.
 
 ---
 

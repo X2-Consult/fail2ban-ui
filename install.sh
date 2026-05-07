@@ -374,10 +374,31 @@ JAILEOF
         echo ""
     fi
 
+    # Warn about per-jail action overrides in jail.d/
+    OVERRIDE_JAILS=()
+    if [[ -d /etc/fail2ban/jail.d ]]; then
+        while IFS= read -r -d '' jailfile; do
+            if grep -qE '^\s*action\s*=' "$jailfile" 2>/dev/null; then
+                OVERRIDE_JAILS+=("$jailfile")
+            fi
+        done < <(find /etc/fail2ban/jail.d -maxdepth 1 -name '*.conf' -print0 2>/dev/null)
+    fi
+    if [[ ${#OVERRIDE_JAILS[@]} -gt 0 ]]; then
+        warn "⚠️  The following jail.d files have their own 'action =' line which overrides [DEFAULT]:"
+        for f in "${OVERRIDE_JAILS[@]}"; do
+            echo -e "    ${CYAN}$f${NC}"
+        done
+        warn "   Fail2ban-UI callbacks will NOT fire for those jails unless you add ui-custom-action explicitly."
+        warn "   For each affected jail, add a second action line inside its [<jailname>] section:"
+        echo -e "  ${CYAN}action = %(action_)s${NC}"
+        echo -e "  ${CYAN}         ui-custom-action[logpath=\"%(logpath)s\", chain=\"%(chain)s\"]${NC}"
+        echo ""
+    fi
+
     if systemctl is-active --quiet fail2ban 2>/dev/null; then
-        info "Reloading Fail2ban to pick up the new action..."
-        systemctl reload fail2ban 2>/dev/null || systemctl restart fail2ban 2>/dev/null
-        success "Fail2ban reloaded."
+        info "Restarting Fail2ban to pick up the new action..."
+        systemctl restart fail2ban 2>/dev/null
+        success "Fail2ban restarted."
     else
         warn "Fail2ban is not running — start it with: systemctl start fail2ban"
     fi

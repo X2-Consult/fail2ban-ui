@@ -192,11 +192,9 @@ Go to **Settings → Manage Servers**, find the server you want to cover, and cl
 1. Write `/etc/fail2ban/action.d/ui-custom-action.conf` on that host (via SSH for remote servers, directly for local servers)
 2. Write `/etc/fail2ban/jail.local` to reference the action (skipped if a user-managed `jail.local` already exists — see note below)
 
-After deploying, **reload Fail2ban on that host** to pick up the changes — Fail2ban-UI does not need to be restarted:
+After deploying, **restart Fail2ban on that host** — `reload` is not sufficient when deploying the action file for the first time:
 
 ```bash
-sudo systemctl reload fail2ban
-# or, if reload is not supported:
 sudo systemctl restart fail2ban
 ```
 
@@ -208,11 +206,22 @@ sudo systemctl restart fail2ban
 > sudo chmod g+w /etc/fail2ban/jail.local
 > ```
 
-> **User-managed jail.local:** If `/etc/fail2ban/jail.local` already exists and was not created by Fail2ban-UI, it will not be overwritten. You must manually add the following to the `[DEFAULT]` section and reload Fail2ban:
+> **User-managed jail.local:** If `/etc/fail2ban/jail.local` already exists and was not created by Fail2ban-UI, it will not be overwritten. You must manually add the following to the `[DEFAULT]` section and restart Fail2ban:
 > ```ini
 > action_mwlg = %(action_)s
 >              ui-custom-action[logpath="%(logpath)s", chain="%(chain)s"]
 > action = %(action_mwlg)s
+> ```
+
+> **Per-jail action override:** If any jail in `/etc/fail2ban/jail.d/` has its own `action =` line, it overrides `[DEFAULT]` for that jail and the callback will not fire. Check for overrides with:
+> ```bash
+> grep -rn "^\s*action\s*=" /etc/fail2ban/jail.d/
+> ```
+> For each affected jail, add `ui-custom-action` explicitly inside that jail's section:
+> ```ini
+> [your-jail-name]
+> action = %(action_)s
+>          ui-custom-action[logpath="%(logpath)s", chain="%(chain)s"]
 > ```
 
 **6. Verify end-to-end**
