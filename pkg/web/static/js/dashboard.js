@@ -233,9 +233,10 @@ function renderDashboard() {
   var enabledServers = serversCache.filter(function(s) { return s.enabled; });
   if (!serversCache.length) {
     container.innerHTML = ''
-      + '<div class="bg-yellow-100 border-l-4 border-yellow-400 text-yellow-700 p-4 rounded mb-4" role="alert">'
-      + '  <p class="font-semibold" data-i18n="dashboard.no_servers_title">No Fail2ban servers configured</p>'
-      + '  <p class="text-sm mt-1" data-i18n="dashboard.no_servers_body">Add a server to start monitoring and controlling Fail2ban instances.</p>'
+      + '<div class="empty-state-card" role="status">'
+      + '  <div class="empty-state-icon"><i class="fas fa-server"></i></div>'
+      + '  <p class="empty-state-title" data-i18n="dashboard.no_servers_title">No Fail2ban servers configured</p>'
+      + '  <p class="empty-state-text" data-i18n="dashboard.no_servers_body">Add a server to start monitoring and controlling Fail2ban instances.</p>'
       + '</div>';
     if (typeof updateTranslations === 'function') updateTranslations();
     restoreFocusState(focusState);
@@ -243,9 +244,10 @@ function renderDashboard() {
   }
   if (!enabledServers.length) {
     container.innerHTML = ''
-      + '<div class="bg-yellow-100 border-l-4 border-yellow-400 text-yellow-700 p-4 rounded mb-4" role="alert">'
-      + '  <p class="font-semibold" data-i18n="dashboard.no_enabled_servers_title">No active connectors</p>'
-      + '  <p class="text-sm mt-1" data-i18n="dashboard.no_enabled_servers_body">Enable the local connector or register a remote Fail2ban server to see live data.</p>'
+      + '<div class="empty-state-card" role="status">'
+      + '  <div class="empty-state-icon"><i class="fas fa-plug-circle-xmark"></i></div>'
+      + '  <p class="empty-state-title" data-i18n="dashboard.no_enabled_servers_title">No active connectors</p>'
+      + '  <p class="empty-state-text" data-i18n="dashboard.no_enabled_servers_body">Enable the local connector or register a remote Fail2ban server to see live data.</p>'
       + '</div>';
     if (typeof updateTranslations === 'function') updateTranslations();
     restoreFocusState(focusState);
@@ -256,20 +258,19 @@ function renderDashboard() {
   // Persistent warning banner when jail.local is not managed by Fail2ban-UI
   if (jailLocalWarning) {
     html += ''
-      + '<div class="bg-red-100 border-l-4 border-red-500 text-red-800 px-4 py-3 rounded mb-4 flex items-start gap-3" role="alert">'
-      + '  <svg class="w-5 h-5 mt-0.5 flex-shrink-0 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
-      + '    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>'
-      + '  </svg>'
-      + '  <div>'
-      + '    <p class="font-semibold" data-i18n="dashboard.jail_local_warning_title">jail.local not managed by Fail2ban-UI</p>'
-      + '    <p class="text-sm mt-1" data-i18n="dashboard.jail_local_warning_body">The file /etc/fail2ban/jail.local on the selected server exists but is not managed by Fail2ban-UI. The callback action (ui-custom-action) is missing, which means ban/unban events will not be recorded and no email alerts will be sent. To fix this, move each jail section from jail.local into its own file under /etc/fail2ban/jail.d/ (use jailname.conf to keep a default or jailname.local to override an existing .conf). Then delete jail.local so Fail2ban-UI can create its own managed version. Ensure Fail2ban-UI has write permissions to /etc/fail2ban/ — see the documentation for details.</p>'
+      + '<div class="alert-card alert-card-danger" role="alert">'
+      + '  <i class="fas fa-circle-exclamation alert-card-icon"></i>'
+      + '  <div class="alert-card-body">'
+      + '    <p class="alert-card-title" data-i18n="dashboard.jail_local_warning_title">jail.local not managed by Fail2ban-UI</p>'
+      + '    <p class="alert-card-text" data-i18n="dashboard.jail_local_warning_body">The file /etc/fail2ban/jail.local on the selected server exists but is not managed by Fail2ban-UI. The callback action (ui-custom-action) is missing, which means ban/unban events will not be recorded and no email alerts will be sent. To fix this, move each jail section from jail.local into its own file under /etc/fail2ban/jail.d/ (use jailname.conf to keep a default or jailname.local to override an existing .conf). Then delete jail.local so Fail2ban-UI can create its own managed version. Ensure Fail2ban-UI has write permissions to /etc/fail2ban/ — see the documentation for details.</p>'
       + '  </div>'
       + '</div>';
   }
   if (latestSummaryError) {
     html += ''
-      + '<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">'
-      + escapeHtml(latestSummaryError)
+      + '<div class="alert-card alert-card-danger" role="alert">'
+      + '  <i class="fas fa-triangle-exclamation alert-card-icon"></i>'
+      + '  <div class="alert-card-body"><p class="alert-card-text">' + escapeHtml(latestSummaryError) + '</p></div>'
       + '</div>';
   }
   // If there is no summary data, we show a loading message
@@ -285,22 +286,34 @@ function renderDashboard() {
     var recurringWeekCount = recurringIPsLastWeekCount();
     html += ''
       + '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">'
-      + '  <div class="bg-white rounded-lg shadow p-4">'
-      + '    <p class="text-sm text-gray-500" data-i18n="dashboard.cards.active_jails">Active Jails</p>'
-      + '    <p class="text-2xl font-semibold text-gray-800">' + (summary.jails ? summary.jails.length : 0) + '</p>'
+      + '  <div class="stat-card">'
+      + '    <div class="stat-card-icon stat-card-icon-blue"><i class="fas fa-shield-halved"></i></div>'
+      + '    <div class="stat-card-body">'
+      + '      <p class="stat-card-label" data-i18n="dashboard.cards.active_jails">Active Jails</p>'
+      + '      <p class="stat-card-value">' + (summary.jails ? summary.jails.length : 0) + '</p>'
+      + '    </div>'
       + '  </div>'
-      + '  <div class="bg-white rounded-lg shadow p-4">'
-      + '    <p class="text-sm text-gray-500" data-i18n="dashboard.cards.total_banned">Total Banned IPs</p>'
-      + '    <p class="text-2xl font-semibold text-gray-800">' + totalBanned + '</p>'
+      + '  <div class="stat-card">'
+      + '    <div class="stat-card-icon stat-card-icon-red"><i class="fas fa-ban"></i></div>'
+      + '    <div class="stat-card-body">'
+      + '      <p class="stat-card-label" data-i18n="dashboard.cards.total_banned">Total Banned IPs</p>'
+      + '      <p class="stat-card-value">' + totalBanned + '</p>'
+      + '    </div>'
       + '  </div>'
-      + '  <div class="bg-white rounded-lg shadow p-4">'
-      + '    <p class="text-sm text-gray-500" data-i18n="dashboard.cards.new_last_hour">New Last Hour</p>'
-      + '    <p class="text-2xl font-semibold text-gray-800">' + newLastHour + '</p>'
+      + '  <div class="stat-card">'
+      + '    <div class="stat-card-icon stat-card-icon-amber"><i class="fas fa-clock-rotate-left"></i></div>'
+      + '    <div class="stat-card-body">'
+      + '      <p class="stat-card-label" data-i18n="dashboard.cards.new_last_hour">New Last Hour</p>'
+      + '      <p class="stat-card-value">' + newLastHour + '</p>'
+      + '    </div>'
       + '  </div>'
-      + '  <div class="bg-white rounded-lg shadow p-4">'
-      + '    <p class="text-sm text-gray-500" data-i18n="dashboard.cards.recurring_week">Recurring IPs</p>'
-      + '    <p class="text-2xl font-semibold text-gray-800">' + recurringWeekCount + '</p>'
-      + '    <p class="text-xs text-gray-500 mt-1" data-i18n="dashboard.cards.recurring_hint">Keep an eye on repeated offenders across all servers.</p>'
+      + '  <div class="stat-card">'
+      + '    <div class="stat-card-icon stat-card-icon-violet"><i class="fas fa-repeat"></i></div>'
+      + '    <div class="stat-card-body">'
+      + '      <p class="stat-card-label" data-i18n="dashboard.cards.recurring_week">Recurring IPs</p>'
+      + '      <p class="stat-card-value">' + recurringWeekCount + '</p>'
+      + '      <p class="stat-card-hint" data-i18n="dashboard.cards.recurring_hint">Repeated offenders this week</p>'
+      + '    </div>'
       + '  </div>'
       + '</div>'
       + '<div class="bg-white rounded-lg shadow p-6 mb-6">'

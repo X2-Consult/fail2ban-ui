@@ -33,12 +33,18 @@
   <script>
     (function() {
       var theme = 'light';
-      var autoDark = document.documentElement.getAttribute('data-auto-dark') === 'true';
-      try {
-        if (autoDark && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-          theme = 'dark';
-        }
-      } catch (e) { }
+      var saved = null;
+      try { saved = localStorage.getItem('f2b-theme'); } catch (e) {}
+      if (saved === 'dark' || saved === 'light') {
+        theme = saved;
+      } else {
+        var autoDark = document.documentElement.getAttribute('data-auto-dark') === 'true';
+        try {
+          if (autoDark && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            theme = 'dark';
+          }
+        } catch (e) {}
+      }
       document.documentElement.setAttribute('data-theme', theme);
     })();
   </script>
@@ -85,10 +91,13 @@
   </div>
 
   <!-- Restart Banner -->
-  <div id="restartBanner" class="bg-yellow-400 text-gray-900 p-3 text-center">
+  <div id="restartBanner" class="text-white p-3 text-center">
     <div class="max-w-screen-2xl mx-auto flex flex-col md:flex-row items-center justify-center gap-4">
-      <strong data-i18n="restart_banner.message">Fail2ban configuration changed! To apply the changes, please: </strong>
-      <button class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors" onclick="restartFail2ban()" data-i18n="restart_banner.button">Restart Service</button>
+      <span class="flex items-center gap-2">
+        <i class="fas fa-triangle-exclamation"></i>
+        <strong data-i18n="restart_banner.message">Fail2ban configuration changed! To apply the changes, please: </strong>
+      </span>
+      <button class="bg-white bg-opacity-20 border border-white border-opacity-30 text-white px-4 py-1.5 rounded-lg hover:bg-opacity-30 transition-colors font-medium text-sm" onclick="restartFail2ban()" data-i18n="restart_banner.button">Restart Service</button>
     </div>
   </div>
 
@@ -119,6 +128,9 @@
             <div id="clockDisplay" class="ml-4 text-sm font-mono">
               <span id="clockTime">--:--:--</span>
             </div>
+            <button id="themeToggleBtn" onclick="toggleTheme()" class="p-2 rounded-md hover:bg-blue-700 transition-colors focus:outline-none" aria-label="Toggle dark mode">
+              <i id="themeToggleIcon" class="fas fa-moon text-sm"></i>
+            </button>
             <div id="userInfoContainer" class="hidden ml-4 flex items-center gap-3 border-l border-blue-500 pl-4">
               <div class="relative">
                 <button id="userMenuButton" onclick="toggleUserMenu()" class="flex items-center gap-2 px-3 py-2 rounded text-sm font-medium hover:bg-blue-700 transition-colors focus:outline-none">
@@ -153,6 +165,10 @@
         <a href="#" onclick="showSection('dashboardSection')" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.dashboard">Dashboard</a>
         <a href="#" onclick="showSection('filterSection')" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.filter_debug">Filter Debug</a>
         <a href="#" onclick="showSection('settingsSection')" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.settings">Settings</a>
+        <button onclick="toggleTheme()" class="flex items-center gap-2 w-full px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition-colors">
+          <i id="themeToggleIconMobile" class="fas fa-moon"></i>
+          <span id="themeToggleLabelMobile">Dark Mode</span>
+        </button>
         <div id="mobileUserInfoContainer" class="hidden border-t border-blue-500 mt-2 pt-2">
           <div class="px-3 py-2">
             <div class="text-sm font-medium" id="mobileUserDisplayName"></div>
@@ -182,16 +198,10 @@
           <h2 class="text-3xl font-bold text-gray-900 mb-2" data-i18n="auth.login_title">Sign in to Fail2ban UI</h2>
           <p class="text-sm text-gray-600" data-i18n="auth.login_description">Please authenticate to access the management interface</p>
         </div>
-        <div id="loginError" class="hidden bg-red-50 border-l-4 border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-          <div class="flex">
-            <div class="flex-shrink-0">
-              <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-              </svg>
-            </div>
-            <div class="ml-3">
-              <p class="text-sm font-medium" id="loginErrorText"></p>
-            </div>
+        <div id="loginError" class="hidden alert-card alert-card-danger mb-6">
+          <i class="fas fa-circle-xmark alert-card-icon"></i>
+          <div class="alert-card-body">
+            <p class="text-sm font-medium" id="loginErrorText"></p>
           </div>
         </div>
         <div class="mb-6">
@@ -239,14 +249,14 @@
           </div>
           {{end}}
           <div class="flex flex-col sm:flex-row gap-3">
-            <button class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors flex items-center gap-2"
+            <button class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 font-medium"
               onclick="openServerManager()">
               <i class="fas fa-network-wired"></i>
               <span data-i18n="dashboard.manage_servers">Manage Servers</span>
             </button>
-            <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
+            <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 font-medium"
               onclick="openManageJailsModal()">
-              <i class="fas fa-cog"></i>
+              <i class="fas fa-sliders"></i>
               <span data-i18n="dashboard.manage_jails">Manage Jails</span>
             </button>
           </div>
@@ -263,7 +273,7 @@
     <div id="filterSection" class="hidden">
       <h2 class="text-2xl font-bold text-gray-800 mb-6" data-i18n="filter_debug.title">Filter Debug</h2>
 
-      <div id="filterNotice" class="hidden mb-4 text-sm text-yellow-700 bg-yellow-100 border border-yellow-200 rounded px-4 py-3"></div>
+      <div id="filterNotice" class="hidden alert-card alert-card-warning mb-4 text-sm"></div>
 
       <div class="bg-white rounded-lg shadow p-6 mb-6">
         <div class="mb-4 flex justify-between items-end">
@@ -293,7 +303,7 @@
                     data-i18n-placeholder="filter_debug.log_lines_placeholder" placeholder="Enter log lines here..."></textarea>
         </div>
 
-        <button class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors" onclick="testSelectedFilter()" data-i18n="filter_debug.test_filter">Test Filter</button>
+        <button class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors font-medium" onclick="testSelectedFilter()" data-i18n="filter_debug.test_filter">Test Filter</button>
       </div>
 
       <div id="testResults" class="hidden bg-gray-900 rounded-lg shadow p-6 text-white font-mono text-sm"></div>
@@ -384,8 +394,8 @@
               <p class="text-sm text-gray-500" data-i18n="settings.advanced.description">Automatically add recurring offenders to an external firewall once they hit a specific threshold.</p>
             </div>
             <div class="flex gap-2">
-              <button type="button" class="px-3 py-2 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50" onclick="refreshPermanentBlockLog()" data-i18n="settings.advanced.refresh_log">Refresh Log</button>
-              <button type="button" class="px-3 py-2 text-sm rounded border border-blue-600 text-blue-600 hover:bg-blue-50" onclick="openAdvancedTestModal()" data-i18n="settings.advanced.test_button">Manually Block / Test</button>
+              <button type="button" class="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium transition-colors" onclick="refreshPermanentBlockLog()" data-i18n="settings.advanced.refresh_log">Refresh Log</button>
+              <button type="button" class="px-3 py-2 text-sm rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50 font-medium transition-colors" onclick="openAdvancedTestModal()" data-i18n="settings.advanced.test_button">Manually Block / Test</button>
             </div>
           </div>
           <div class="mt-4 space-y-4">
