@@ -65,6 +65,30 @@ With a subpath:
 -e CALLBACK_SECRET='replace-with-a-random-secret'
 ```
 
+## Credential encryption at rest
+
+- `ENCRYPTION_KEY`  
+  64-character hex string (32 bytes). When set, all credentials stored in the database are encrypted with AES-256-GCM before being written. Existing plaintext values are read transparently and re-encrypted on the next settings save.
+
+  Generate a key:
+
+  ```bash
+  openssl rand -hex 32
+  ```
+
+  See [`docs/security.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/security.md) for migration notes and key rotation guidance.
+
+## SSH connector settings
+
+- `SSH_KNOWN_HOSTS`  
+  Path to the SSH known-hosts file used for host key verification when connecting to remote Fail2Ban hosts. Defaults to `~/.ssh/known_hosts`.
+
+  ```bash
+  SSH_KNOWN_HOSTS=/etc/fail2ban-ui/known_hosts
+  ```
+
+  On first connection to a new host the key is accepted automatically and saved to this file (TOFU). On subsequent connections, a key mismatch is rejected. See [`docs/security.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/security.md) for details.
+
 ## Privacy and telemetry controls
 
 - `DISABLE_EXTERNAL_IP_LOOKUP=true`  

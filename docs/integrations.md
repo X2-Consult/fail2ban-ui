@@ -43,6 +43,12 @@ Go to **Settings → Advanced Actions**, select **Mikrotik**, and fill in:
 
 Click **Save**. Trigger a manual ban from the UI and verify the IP appears in **IP → Firewall → Address Lists** on the router.
 
+### Host key verification (TOFU)
+
+The MikroTik integration connects via SSH. On first use the router's SSH host key fingerprint is automatically accepted and saved in Settings. All later connections verify against that saved fingerprint — a mismatch (e.g. after a router reset or firmware reinstall) is rejected.
+
+**After a deliberate key change**, go to **Settings → Advanced Actions → Mikrotik**, clear the `HostFingerprint` field, and save. The next connection will re-learn the new key.
+
 ---
 
 ## pfSense
