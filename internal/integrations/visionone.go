@@ -99,6 +99,9 @@ func (v *visionOneIntegration) modifySuspiciousObject(req Request, add bool) err
 
 	client := &http.Client{Timeout: 15 * time.Second}
 	if cfg.SkipTLSVerify {
+		if req.Logger != nil {
+			req.Logger("Vision One: WARNING — TLS verification is disabled (SkipTLSVerify=true)")
+		}
 		client.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
@@ -140,7 +143,7 @@ func (v *visionOneIntegration) modifySuspiciousObject(req Request, add bool) err
 	}
 
 	if req.Logger != nil {
-		req.Logger("Vision One API %s %s payload=%s", method, endpoint, string(body))
+		req.Logger("Vision One API %s %s payload=%s token=[REDACTED]", method, endpoint, string(body))
 	}
 
 	httpReq, err := http.NewRequestWithContext(req.Context, method, endpoint, bytes.NewReader(body))

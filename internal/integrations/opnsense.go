@@ -88,6 +88,9 @@ func (o *opnsenseIntegration) callAPI(req Request, action, ip string) error {
 		Timeout: 10 * time.Second,
 	}
 	if cfg.SkipTLSVerify {
+		if req.Logger != nil {
+			req.Logger("OPNsense: WARNING — TLS verification is disabled (SkipTLSVerify=true)")
+		}
 		httpClient.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}

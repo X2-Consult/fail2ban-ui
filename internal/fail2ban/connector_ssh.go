@@ -483,11 +483,12 @@ func (sc *SSHConnector) readRemoteFile(ctx context.Context, filePath string) (st
 
 func (sc *SSHConnector) writeRemoteFile(ctx context.Context, filePath, content string) error {
 	escaped := strings.ReplaceAll(content, "'", "'\"'\"'")
+	quotedPath := "'" + strings.ReplaceAll(filePath, "'", "'\"'\"'") + "'"
 
 	script := fmt.Sprintf(`cat > %s <<'REMOTEEOF'
 %s
 REMOTEEOF
-`, filePath, escaped)
+`, quotedPath, escaped)
 
 	_, err := sc.runRemoteCommand(ctx, []string{script})
 	if err != nil {
