@@ -19,6 +19,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -68,6 +69,15 @@ func main() {
 			log.Fatalf("failed to initialize OIDC: %v", err)
 		}
 		log.Println("OIDC authentication enabled")
+		if oidcConfig.SkipVerify {
+			log.Println("⚠️  WARNING: OIDC_SKIP_VERIFY is enabled — TLS certificate verification")
+			log.Println("⚠️  for the OIDC provider is disabled. Do not use in production.")
+		}
+		if os.Getenv("OIDC_SESSION_SECRET") == "" {
+			log.Println("⚠️  WARNING: OIDC_SESSION_SECRET is not set. A random secret was generated")
+			log.Println("⚠️  and all sessions will be invalidated on every restart.")
+			log.Println("⚠️  Set OIDC_SESSION_SECRET to a stable random value for production.")
+		}
 	} else {
 		log.Println("⚠️  ══════════════════════════════════════════════════════════════")
 		log.Println("⚠️  SECURITY WARNING: Authentication is NOT configured.")

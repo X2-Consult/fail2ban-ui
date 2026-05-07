@@ -58,6 +58,57 @@ import (
 
 var wsHub *Hub
 
+// blockedCIDRs are address ranges that must never be the target of an
+// admin-configured outbound HTTP call (webhook, Elasticsearch, etc.) to
+// prevent server-side request forgery against internal infrastructure.
+var blockedCIDRs = func() []*net.IPNet {
+	ranges := []string{
+		"127.0.0.0/8",    // loopback
+		"::1/128",        // IPv6 loopback
+		"10.0.0.0/8",     // RFC-1918
+		"172.16.0.0/12",  // RFC-1918
+		"192.168.0.0/16", // RFC-1918
+		"169.254.0.0/16", // link-local (AWS metadata, etc.)
+		"fe80::/10",      // IPv6 link-local
+		"100.64.0.0/10",  // shared address space (RFC-6598)
+		"0.0.0.0/8",      // "this" network
+	}
+	nets := make([]*net.IPNet, 0, len(ranges))
+	for _, r := range ranges {
+		_, cidr, _ := net.ParseCIDR(r)
+		nets = append(nets, cidr)
+	}
+	return nets
+}()
+
+// checkSSRF returns an error if rawURL resolves to a blocked (internal) address.
+func checkSSRF(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("URL scheme %q is not allowed", u.Scheme)
+	}
+	host := u.Hostname()
+	ips, err := net.LookupHost(host)
+	if err != nil {
+		return fmt.Errorf("could not resolve host %q: %w", host, err)
+	}
+	for _, ipStr := range ips {
+		ip := net.ParseIP(ipStr)
+		if ip == nil {
+			continue
+		}
+		for _, blocked := range blockedCIDRs {
+			if blocked.Contains(ip) {
+				return fmt.Errorf("URL resolves to a private/internal address (%s) and cannot be used as a webhook target", ipStr)
+			}
+		}
+	}
+	return nil
+}
+
 // SetWebSocketHub sets the global WebSocket hub instance
 func SetWebSocketHub(hub *Hub) {
 	wsHub = hub
@@ -1274,6 +1325,9 @@ func sendWebhookAlert(alertType, ip, jail, hostname, failures, whois, logs, coun
 	if cfg.URL == "" {
 		return fmt.Errorf("webhook URL is not configured")
 	}
+	if err := checkSSRF(cfg.URL); err != nil {
+		return fmt.Errorf("webhook URL rejected: %w", err)
+	}
 
 	payload := map[string]interface{}{
 		"event":     alertType,
@@ -1333,6 +1387,9 @@ func sendElasticsearchAlert(alertType, ip, jail, hostname, failures, whois, logs
 	cfg := settings.Elasticsearch
 	if cfg.URL == "" {
 		return fmt.Errorf("elasticsearch URL is not configured")
+	}
+	if err := checkSSRF(cfg.URL); err != nil {
+		return fmt.Errorf("elasticsearch URL rejected: %w", err)
 	}
 
 	index := cfg.Index

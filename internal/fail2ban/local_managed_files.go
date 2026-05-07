@@ -80,7 +80,7 @@ func WriteLocalActionFile(configPath, callbackURL, serverID string) error {
 	}
 	secret := p.CallbackSecret()
 	cfg := p.BuildFail2banActionConfig(callbackURL, serverID, secret)
-	if err := os.WriteFile(actionPath, []byte(cfg), 0644); err != nil {
+	if err := os.WriteFile(actionPath, []byte(cfg), 0600); err != nil {
 		return fmt.Errorf("failed to write action file: %w", err)
 	}
 	debugf("Custom-action file successfully written to %s\n", actionPath)

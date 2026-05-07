@@ -171,6 +171,9 @@ type OIDCConfig struct {
 	UsernameClaim string   `json:"usernameClaim"`
 	LogoutURL     string   `json:"logoutURL"`
 	SkipLoginPage bool     `json:"skipLoginPage"`
+	// RequiredGroup gates access to users who are members of this group/role
+	// (matched against the "groups" or "roles" claim). Empty = no restriction.
+	RequiredGroup string `json:"requiredGroup"`
 }
 
 func defaultAdvancedActionsConfig() AdvancedActionsConfig {
@@ -670,14 +673,8 @@ func setDefaultsLocked() {
 	if currentSettings.SMTP.Port == 0 {
 		currentSettings.SMTP.Port = 587
 	}
-	if currentSettings.SMTP.Username == "" {
-		currentSettings.SMTP.Username = "noreply@swissmakers.ch"
-	}
-	if currentSettings.SMTP.Password == "" {
-		currentSettings.SMTP.Password = "password"
-	}
-	if currentSettings.SMTP.From == "" {
-		currentSettings.SMTP.From = "noreply@swissmakers.ch"
+	if currentSettings.SMTP.From == "" && currentSettings.SMTP.Username != "" {
+		currentSettings.SMTP.From = currentSettings.SMTP.Username
 	}
 	if !currentSettings.SMTP.UseTLS {
 		currentSettings.SMTP.UseTLS = true
@@ -1421,6 +1418,7 @@ func GetOIDCConfigFromEnv() (*OIDCConfig, error) {
 		config.UsernameClaim = "preferred_username"
 	}
 	config.LogoutURL = os.Getenv("OIDC_LOGOUT_URL")
+	config.RequiredGroup = os.Getenv("OIDC_REQUIRED_GROUP")
 	return config, nil
 }
 

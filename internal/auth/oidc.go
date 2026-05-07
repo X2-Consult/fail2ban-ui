@@ -237,5 +237,38 @@ func (c *OIDCClient) VerifyToken(ctx context.Context, token *oauth2.Token) (*Use
 			userInfo.Name = userInfo.Username
 		}
 	}
+
+	// Enforce group/role membership if OIDC_REQUIRED_GROUP is set.
+	if required := c.Config.RequiredGroup; required != "" {
+		var rawClaims map[string]interface{}
+		if err := idToken.Claims(&rawClaims); err != nil {
+			return nil, fmt.Errorf("failed to read raw claims for group check: %w", err)
+		}
+		if !userInGroup(rawClaims, required) {
+			return nil, fmt.Errorf("access denied: user is not a member of required group %q", required)
+		}
+	}
+
 	return userInfo, nil
+}
+
+// userInGroup checks the "groups" and "roles" claims for the required value.
+func userInGroup(claims map[string]interface{}, required string) bool {
+	for _, key := range []string{"groups", "roles"} {
+		if raw, ok := claims[key]; ok {
+			switch v := raw.(type) {
+			case []interface{}:
+				for _, item := range v {
+					if s, ok := item.(string); ok && s == required {
+						return true
+					}
+				}
+			case string:
+				if v == required {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

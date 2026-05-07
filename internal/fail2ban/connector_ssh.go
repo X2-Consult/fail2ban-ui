@@ -60,7 +60,9 @@ try:
     action_dir = pathlib.Path("/etc/fail2ban/action.d")
     action_dir.mkdir(parents=True, exist_ok=True)
     action_cfg = base64.b64decode("__PAYLOAD__").decode("utf-8")
-    (action_dir / "ui-custom-action.conf").write_text(action_cfg)
+    action_file = action_dir / "ui-custom-action.conf"
+    action_file.write_text(action_cfg)
+    action_file.chmod(0o600)
 except Exception as e:
     sys.stderr.write(f"Error: {e}\n")
     sys.exit(1)
