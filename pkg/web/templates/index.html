@@ -124,6 +124,7 @@
           <div class="ml-10 flex items-baseline space-x-4 items-center">
             <a href="#" onclick="showSection('dashboardSection')" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.dashboard">Dashboard</a>
             <a href="#" onclick="showSection('filterSection')" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.filter_debug">Filter Debug</a>
+            <a href="#" onclick="showSection('ignorelistSection'); loadIgnoreListSection();" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.ignorelist">Ignore List</a>
             <a href="#" onclick="showSection('settingsSection')" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.settings">Settings</a>
             <div id="clockDisplay" class="ml-4 text-sm font-mono">
               <span id="clockTime">--:--:--</span>
@@ -164,6 +165,7 @@
       <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
         <a href="#" onclick="showSection('dashboardSection')" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.dashboard">Dashboard</a>
         <a href="#" onclick="showSection('filterSection')" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.filter_debug">Filter Debug</a>
+        <a href="#" onclick="showSection('ignorelistSection'); loadIgnoreListSection();" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.ignorelist">Ignore List</a>
         <a href="#" onclick="showSection('settingsSection')" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition-colors" data-i18n="nav.settings">Settings</a>
         <button onclick="toggleTheme()" class="flex items-center gap-2 w-full px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition-colors">
           <i id="themeToggleIconMobile" class="fas fa-moon"></i>
@@ -309,6 +311,45 @@
       <div id="testResults" class="hidden bg-gray-900 rounded-lg shadow p-6 text-white font-mono text-sm"></div>
     </div>
     <!-- ********************* Filter-Debug Page END *********************** -->
+
+
+    <!-- ******************************************************************* -->
+    <!--                       Ignore List Page START                        -->
+    <!-- ******************************************************************* -->
+    <div id="ignorelistSection" class="hidden">
+      <h2 class="text-2xl font-bold text-gray-800 mb-2" data-i18n="ignorelist.title">Ignore List</h2>
+      <p class="text-sm text-gray-500 mb-6" data-i18n="ignorelist.description">IPs, CIDRs, and hostnames in this list will never be banned by fail2ban. Changes are applied immediately across all servers.</p>
+
+      <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="bg-gray-50 border-b border-gray-200">
+                <th class="px-4 py-3 text-sm font-medium text-gray-700">IP / CIDR / Hostname</th>
+                <th class="px-4 py-3 text-sm font-medium text-gray-700 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="ignoreListTableBody">
+              <tr><td colspan="2" class="px-4 py-8 text-center text-gray-500 text-sm">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-base font-medium text-gray-900 mb-3" data-i18n="ignorelist.add_entry">Add Entry</h3>
+        <p class="text-xs text-gray-500 mb-3" data-i18n="ignorelist.add_entry.description">Enter an IP address (e.g. 203.0.113.5), CIDR range (e.g. 203.0.113.0/24), or hostname. Press Enter or click Add.</p>
+        <div class="flex gap-2">
+          <input type="text" id="ignoreListInput" placeholder="e.g. 203.0.113.5 or 203.0.113.0/24"
+                 class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" />
+          <button type="button" onclick="addIgnoreListEntry()"
+                  class="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">
+            Add
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- ************************ Ignore List Page END ************************ -->
 
 
     <!-- ******************************************************************* -->

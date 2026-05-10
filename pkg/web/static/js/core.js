@@ -290,9 +290,10 @@ function updateRestartBanner() {
 
 function showSection(sectionId) {
   // hide all sections
-  document.getElementById('dashboardSection').classList.add('hidden');
-  document.getElementById('filterSection').classList.add('hidden');
-  document.getElementById('settingsSection').classList.add('hidden');
+  ['dashboardSection', 'filterSection', 'settingsSection', 'ignorelistSection'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
 
   // show the requested section
   document.getElementById(sectionId).classList.remove('hidden');

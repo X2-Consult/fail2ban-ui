@@ -110,3 +110,98 @@ function getIgnoreIPsArray() {
   const tags = container.querySelectorAll('.ignore-ip-tag');
   return Array.from(tags).map(tag => tag.dataset.ip).filter(ip => ip && ip.trim());
 }
+
+// =========================================================================
+//  Dedicated Ignore List Section
+// =========================================================================
+
+function loadIgnoreListSection() {
+  fetch(appPath('/api/ignorelist'), { headers: serverHeaders() })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      renderIgnoreListTable(data.ignoreips || []);
+    })
+    .catch(function(err) {
+      showToast('Error loading ignore list: ' + err, 'error');
+    });
+}
+
+function renderIgnoreListTable(ips) {
+  var tbody = document.getElementById('ignoreListTableBody');
+  if (!tbody) return;
+  if (!ips || ips.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="2" class="px-4 py-8 text-center text-gray-500 text-sm">No entries in the ignore list. Add an IP or CIDR below.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = ips.map(function(ip) {
+    var safe = escapeHtml(ip);
+    return '<tr class="border-t border-gray-100 hover:bg-gray-50">'
+      + '<td class="px-4 py-3 font-mono text-sm text-gray-900">' + safe + '</td>'
+      + '<td class="px-4 py-3 text-right">'
+      + '<button class="text-red-600 hover:text-red-800 text-sm font-medium" onclick="removeIgnoreListEntry(\'' + safe.replace(/'/g, "\\'") + '\')">'
+      + 'Remove'
+      + '</button>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+function addIgnoreListEntry() {
+  var input = document.getElementById('ignoreListInput');
+  if (!input) return;
+  var ip = input.value.trim();
+  if (!ip) return;
+  if (typeof isValidIP === 'function' && !isValidIP(ip)) {
+    showToast('Invalid IP address, CIDR, or hostname: ' + ip, 'error');
+    return;
+  }
+  fetch(appPath('/api/ignorelist'), {
+    method: 'POST',
+    headers: Object.assign({'Content-Type': 'application/json'}, serverHeaders()),
+    body: JSON.stringify({ ip: ip })
+  })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.error) {
+        showToast('Error: ' + data.error, 'error');
+      } else {
+        input.value = '';
+        renderIgnoreListTable(data.ignoreips || []);
+        showToast(ip + ' added to ignore list', 'success');
+      }
+    })
+    .catch(function(err) {
+      showToast('Error: ' + err, 'error');
+    });
+}
+
+function removeIgnoreListEntry(ip) {
+  if (!confirm('Remove ' + ip + ' from the ignore list?')) return;
+  fetch(appPath('/api/ignorelist?ip=' + encodeURIComponent(ip)), {
+    method: 'DELETE',
+    headers: serverHeaders()
+  })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.error) {
+        showToast('Error: ' + data.error, 'error');
+      } else {
+        renderIgnoreListTable(data.ignoreips || []);
+        showToast(ip + ' removed from ignore list', 'success');
+      }
+    })
+    .catch(function(err) {
+      showToast('Error: ' + err, 'error');
+    });
+}
+
+function setupIgnoreListSectionInput() {
+  var input = document.getElementById('ignoreListInput');
+  if (!input) return;
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addIgnoreListEntry();
+    }
+  });
+}

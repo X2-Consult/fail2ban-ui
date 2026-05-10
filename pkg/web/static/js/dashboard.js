@@ -221,6 +221,34 @@ function unbanIP(jail, ip) {
     });
 }
 
+// Adds an IP to the global ignore list and unbans it from the given jail.
+function unbanAndIgnoreIP(jail, ip) {
+  if (!confirm('Add ' + ip + ' to the ignore list and unban from ' + jail + '?\n\nFail2ban will never block this IP again.')) {
+    return;
+  }
+  showLoading(true);
+  fetch(appPath('/api/ignorelist'), {
+    method: 'POST',
+    headers: Object.assign({'Content-Type': 'application/json'}, serverHeaders()),
+    body: JSON.stringify({ ip: ip, jail: jail })
+  })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.error) {
+        showToast('Error: ' + data.error, 'error');
+      } else {
+        showToast(ip + ' added to ignore list', 'success');
+        return refreshData({ silent: true });
+      }
+    })
+    .catch(function(err) {
+      showToast('Error: ' + err, 'error');
+    })
+    .finally(function() {
+      showLoading(false);
+    });
+}
+
 // =========================================================================
 //  Main Dashboard Rendering Function
 // =========================================================================
@@ -470,10 +498,16 @@ function renderBannedIPs(jailName, ips) {
     return ''
       + '<div class="flex items-center justify-between banned-ip-item" data-ip="' + safeIp + '">'
       + ipLabel
-      + '  <button class="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition-colors"'
-      + '    onclick="unbanIP(\'' + escapeHtml(jailName) + '\', \'' + escapeHtml(ip) + '\')">'
-      + '    <span data-i18n="dashboard.unban">Unban</span>'
-      + '  </button>'
+      + '  <div class="flex gap-1 flex-shrink-0">'
+      + '    <button class="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition-colors"'
+      + '      onclick="unbanIP(\'' + escapeHtml(jailName) + '\', \'' + escapeHtml(ip) + '\')">'
+      + '      <span data-i18n="dashboard.unban">Unban</span>'
+      + '    </button>'
+      + '    <button class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors" title="Unban and add to ignore list so this IP is never blocked again"'
+      + '      onclick="unbanAndIgnoreIP(\'' + escapeHtml(jailName) + '\', \'' + escapeHtml(ip) + '\')">'
+      + '      <span data-i18n="dashboard.ignore">Ignore</span>'
+      + '    </button>'
+      + '  </div>'
       + '</div>';
   }
   visible.forEach(function(ip) {

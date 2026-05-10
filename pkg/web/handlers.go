@@ -2892,6 +2892,153 @@ func UpdateSettingsHandler(c *gin.Context) {
 }
 
 // =========================================================================
+//  Ignore List
+// =========================================================================
+
+// Returns the current global ignore IP list.
+func GetIgnoreListHandler(c *gin.Context) {
+	s := config.GetSettings()
+	c.JSON(http.StatusOK, gin.H{"ignoreips": s.IgnoreIPs})
+}
+
+// Adds a single IP/CIDR/hostname to the global ignore list, then pushes the
+// updated DEFAULT section to all servers and reloads fail2ban.
+// Optional field "jail" causes the IP to also be unbanned from that jail.
+func AddIgnoreIPHandler(c *gin.Context) {
+	var req struct {
+		IP   string `json:"ip"`
+		Jail string `json:"jail"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+	req.IP = strings.TrimSpace(req.IP)
+	if req.IP == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ip is required"})
+		return
+	}
+	// Validate: must be an IP, CIDR, or a simple hostname (no shell metacharacters)
+	validEntry := regexp.MustCompile(`^[a-zA-Z0-9:./\-_]+$`)
+	if !validEntry.MatchString(req.IP) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid IP, CIDR, or hostname"})
+		return
+	}
+
+	old := config.GetSettings()
+	for _, existing := range old.IgnoreIPs {
+		if existing == req.IP {
+			c.JSON(http.StatusOK, gin.H{"message": "IP already in ignore list", "ignoreips": old.IgnoreIPs})
+			return
+		}
+	}
+
+	newSettings := old
+	newSettings.IgnoreIPs = append(newSettings.IgnoreIPs, req.IP)
+
+	updated, err := config.UpdateSettings(newSettings)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update settings: " + err.Error()})
+		return
+	}
+
+	// If a jail was specified, also unban the IP from that jail
+	if req.Jail != "" {
+		conn, connErr := resolveConnector(c)
+		if connErr == nil {
+			if unbanErr := conn.UnbanIP(c.Request.Context(), req.Jail, req.IP); unbanErr != nil {
+				config.DebugLog("Warning: failed to unban %s from %s: %v", req.IP, req.Jail, unbanErr)
+			}
+		}
+	}
+
+	// Push updated DEFAULT section to all servers and reload
+	if err := config.ReloadFail2banManager(); err != nil {
+		config.DebugLog("Warning: failed to reload fail2ban manager: %v", err)
+	}
+	connectors := fail2ban.GetManager().Connectors()
+	for _, conn := range connectors {
+		server := conn.Server()
+		if !server.Enabled {
+			continue
+		}
+		if err := conn.UpdateDefaultSettings(c.Request.Context()); err != nil {
+			config.DebugLog("Warning: failed to push DEFAULT settings to %s: %v", server.Name, err)
+			continue
+		}
+		if err := conn.Reload(c.Request.Context()); err != nil {
+			config.DebugLog("Warning: failed to reload fail2ban on %s: %v", server.Name, err)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "IP added to ignore list", "ignoreips": updated.IgnoreIPs})
+}
+
+// Removes a single IP/CIDR/hostname from the global ignore list, then pushes
+// the updated DEFAULT section to all servers and reloads fail2ban.
+// Accepts ?ip= query param or a JSON body {"ip": "..."}.
+func RemoveIgnoreIPHandler(c *gin.Context) {
+	ip := strings.TrimSpace(c.Query("ip"))
+	if ip == "" {
+		var body struct {
+			IP string `json:"ip"`
+		}
+		if err := c.ShouldBindJSON(&body); err == nil {
+			ip = strings.TrimSpace(body.IP)
+		}
+	}
+	if ip == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ip is required"})
+		return
+	}
+
+	old := config.GetSettings()
+	newIPs := make([]string, 0, len(old.IgnoreIPs))
+	found := false
+	for _, existing := range old.IgnoreIPs {
+		if existing == ip {
+			found = true
+			continue
+		}
+		newIPs = append(newIPs, existing)
+	}
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "IP not found in ignore list"})
+		return
+	}
+
+	newSettings := old
+	newSettings.IgnoreIPs = newIPs
+
+	updated, err := config.UpdateSettings(newSettings)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update settings: " + err.Error()})
+		return
+	}
+
+	// Push updated DEFAULT section to all servers and reload
+	if err := config.ReloadFail2banManager(); err != nil {
+		config.DebugLog("Warning: failed to reload fail2ban manager: %v", err)
+	}
+	connectors := fail2ban.GetManager().Connectors()
+	for _, conn := range connectors {
+		server := conn.Server()
+		if !server.Enabled {
+			continue
+		}
+		if err := conn.UpdateDefaultSettings(c.Request.Context()); err != nil {
+			config.DebugLog("Warning: failed to push DEFAULT settings to %s: %v", server.Name, err)
+			continue
+		}
+		if err := conn.Reload(c.Request.Context()); err != nil {
+			config.DebugLog("Warning: failed to reload fail2ban on %s: %v", server.Name, err)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "IP removed from ignore list", "ignoreips": updated.IgnoreIPs})
+}
+
+// =========================================================================
 //  Filters
 // =========================================================================
 

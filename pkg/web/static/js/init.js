@@ -185,6 +185,10 @@ function initializeApp() {
       setupIgnoreIPsInput();
     }
 
+    if (typeof setupIgnoreListSectionInput === 'function') {
+      setupIgnoreListSectionInput();
+    }
+
     if (typeof setupFormValidation === 'function') {
       setupFormValidation();
     }

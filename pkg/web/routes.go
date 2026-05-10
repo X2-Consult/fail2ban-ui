@@ -81,6 +81,11 @@ func RegisterRoutes(r *gin.Engine, hub *Hub) {
 		api.POST("/settings/test-webhook", TestWebhookHandler)
 		api.POST("/settings/test-elasticsearch", TestElasticsearchHandler)
 
+		// Ignore list management (targeted add/remove without full settings payload)
+		api.GET("/ignorelist", GetIgnoreListHandler)
+		api.POST("/ignorelist", AddIgnoreIPHandler)
+		api.DELETE("/ignorelist", RemoveIgnoreIPHandler)
+
 		// Internal API calls for advanced actions
 		api.GET("/advanced-actions/blocks", ListPermanentBlocksHandler)
 		api.DELETE("/advanced-actions/blocks", ClearPermanentBlocksHandler)
