@@ -1799,7 +1799,7 @@ func GetVersionHandler(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 8*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/swissmakers/fail2ban-ui/releases/latest", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/X2-Consult/fail2ban-ui/releases/latest", nil)
 	if err != nil {
 		c.JSON(http.StatusOK, out)
 		return
@@ -1833,6 +1833,10 @@ func versionLess(a, b string) bool {
 		parts := strings.Split(s, ".")
 		out := make([]int, 0, len(parts))
 		for _, p := range parts {
+			// Strip pre-release suffix (e.g. "8-x2" → "8")
+			if idx := strings.IndexByte(p, '-'); idx >= 0 {
+				p = p[:idx]
+			}
 			n, _ := strconv.Atoi(p)
 			out = append(out, n)
 		}
