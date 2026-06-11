@@ -11,7 +11,7 @@
 
 *Swissmade open-source solution for centralized Fail2Ban management across distributed infrastructure*
 
-[Quick Start](#quick-start-container) • [Documentation](#documentation) • [Configuration Reference](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/configuration.md) • [Screenshots](#screenshots)
+[Quick Start](#quick-start-container) • [Documentation](#documentation) • [Configuration Reference](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/configuration.md) • [Screenshots](#screenshots)
 
 </div>
 
@@ -56,7 +56,7 @@ podman run -d --name fail2ban-ui --network=host \
   -v /etc/fail2ban:/etc/fail2ban:Z \
   -v /var/run/fail2ban:/var/run/fail2ban \
   -v /var/log:/var/log:ro \
-  swissmakers/fail2ban-ui:latest
+  ghcr.io/x2-consult/fail2ban-ui:latest
 ````
 
 Verification:
@@ -70,27 +70,27 @@ Next steps:
 
 ## Documentation
 
-* Installation: [`docs/installation.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/installation.md)
-* Configuration reference (env vars, callback URL/secret, OIDC): [`docs/configuration.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/configuration.md)
-* Reverse proxy guide: [`docs/reverse-proxy.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/reverse-proxy.md)
-* Webhook integration guide: [`docs/webhooks.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/webhooks.md)
-* Security guidance (recommended deployment posture): [`docs/security.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/security.md)
-* Architecture overview: [`docs/architecture.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/architecture.md)
-* API reference: [`docs/api.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/api.md)
-* Alert providers (Email, Webhook, Elasticsearch): [`docs/alert-providers.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/alert-providers.md)
-* Threat intelligence (AlienVault OTX / AbuseIPDB): [`docs/threat-intel.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/threat-intel.md)
-* Advanced action integrations (Mikrotik, pfSense, OPNsense, Vision One): [`docs/integrations.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/integrations.md)
-* Troubleshooting: [`docs/troubleshooting.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/troubleshooting.md)
+* Installation: [`docs/installation.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/installation.md)
+* Configuration reference (env vars, callback URL/secret, OIDC): [`docs/configuration.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/configuration.md)
+* Reverse proxy guide: [`docs/reverse-proxy.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/reverse-proxy.md)
+* Webhook integration guide: [`docs/webhooks.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/webhooks.md)
+* Security guidance (recommended deployment posture): [`docs/security.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/security.md)
+* Architecture overview: [`docs/architecture.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/architecture.md)
+* API reference: [`docs/api.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/api.md)
+* Alert providers (Email, Webhook, Elasticsearch): [`docs/alert-providers.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/alert-providers.md)
+* Threat intelligence (AlienVault OTX / AbuseIPDB): [`docs/threat-intel.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/threat-intel.md)
+* Advanced action integrations (Mikrotik, pfSense, OPNsense, Vision One): [`docs/integrations.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/integrations.md)
+* Troubleshooting: [`docs/troubleshooting.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/troubleshooting.md)
 
 Existing deployment guides in this repository:
 
-* Container: [`deployment/container/README.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/deployment/container/README.md)
-* systemd: [`deployment/systemd/README.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/deployment/systemd/README.md)
-* Optional container SELinux modules (socket/log access): [`deployment/container/SELinux/`](https://github.com/swissmakers/fail2ban-ui/blob/main/deployment/container/SELinux/) — host Fail2Ban `curl` callbacks often need the `nis_enabled` boolean instead; see [`docs/security.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/security.md#selinux)
+* Container: [`deployment/container/README.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/deployment/container/README.md)
+* systemd: [`deployment/systemd/README.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/deployment/systemd/README.md)
+* Optional container SELinux modules (socket/log access): [`deployment/container/SELinux/`](https://github.com/X2-Consult/fail2ban-ui/blob/main/deployment/container/SELinux/) — host Fail2Ban `curl` callbacks often need the `nis_enabled` boolean instead; see [`docs/security.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/security.md#selinux)
 
 Development / testing stacks:
-* OIDC dev stack: [`development/oidc/README.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/development/oidc/README.md)
-* SSH and local connector dev stack: [`development/ssh_and_local/README.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/development/ssh_and_local/README.md)
+* OIDC dev stack: [`development/oidc/README.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/development/oidc/README.md)
+* SSH and local connector dev stack: [`development/ssh_and_local/README.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/development/ssh_and_local/README.md)
 
 Remote Fail2ban **agent** (separate component):
 * Source: [`github.com/swissmakers/fail2ban-ui-agent`](https://github.com/swissmakers/fail2ban-ui-agent)
@@ -170,7 +170,7 @@ Configuration for advanced ban actions including permanent blocking, firewall in
 
 #### Alert Settings
 ![Alert Settings](screenshots/4.3_Settings_AlertSettings.png)
-Alert configuration supporting three providers: Email (SMTP), Webhook, and Elasticsearch. Includes country-based filtering, GeoIP provider selection, and per-event toggles for bans and unbans. See [`docs/alert-providers.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/alert-providers.md) for details.
+Alert configuration supporting three providers: Email (SMTP), Webhook, and Elasticsearch. Includes country-based filtering, GeoIP provider selection, and per-event toggles for bans and unbans. See [`docs/alert-providers.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/alert-providers.md) for details.
 
 #### Global Settings
 ![Global Settings](screenshots/4.4_Settings_GlobalSettings.png)
@@ -182,9 +182,9 @@ Global Fail2Ban settings including default bantime, findtime, maxretry, banactio
 * SSH connector should use a dedicated service account with minimal sudo permissions and ACLs (at minimum `sudo fail2ban-client *` and `sudo systemctl restart fail2ban`).
 * All IP addresses are validated (strict IPv4/IPv6/CIDR parsing) before being passed to any integration or command, preventing command injection.
 * WebSocket connections are protected by origin validation (same-origin only) and require authentication when OIDC is enabled.
-* For production proxy examples and WebSocket requirements, see [`docs/reverse-proxy.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/reverse-proxy.md).
+* For production proxy examples and WebSocket requirements, see [`docs/reverse-proxy.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/reverse-proxy.md).
 
-See [`docs/security.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/security.md) for details.
+See [`docs/security.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/security.md) for details.
 
 ## Contributing
 
@@ -196,7 +196,7 @@ Want to add a new UI language? Copy `pkg/web/locales/en.json`, translate all val
 Please use a proper lowercase locale short code for `<lang>` (for example `ch`, `ch_de`, `es`, or `pt_br`).
 
 
-See [`CONTRIBUTING.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/CONTRIBUTING.md) for more info.
+See [`CONTRIBUTING.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/CONTRIBUTING.md) for more info.
 
 ## License
 

@@ -26,12 +26,8 @@ services:
     restart: unless-stopped
 
   fail2ban-ui:
-    # Use pre-built image from Docker Hub (default)
-    image: swissmakers/fail2ban-ui:latest
-    # Alternative: Use Swissmakers registry (fallback)
-    # image: registry.swissmakers.ch/infra/fail2ban-ui:latest
-    # Alternative: Use your own registry (GitHub Container Registry):
-    # image: ghcr.io/x2-consult/fail2ban-ui:latest
+    # Use pre-built image from GitHub Container Registry (default)
+    image: ghcr.io/x2-consult/fail2ban-ui:latest
     # Or build from source locally (uncomment both lines):
     # image: localhost/fail2ban-ui:dev
     # build: { context: ., dockerfile: Dockerfile }
