@@ -564,7 +564,7 @@ Common issues:
 - **Connection refused / timeout**: Verify the Elasticsearch URL is reachable from the Fail2ban-UI host
 - **401 Unauthorized**: API key or credentials are incorrect. Verify the API key in Kibana → Stack Management → API Keys
 - **403 Forbidden**: The API key lacks write permissions on the target index. Create a key with `write` and `create_index` privileges for `fail2ban-events-*`
-- **Index template missing**: Without an index template, Elasticsearch uses dynamic mapping which may produce suboptimal field types. Create the template as described in [`alert-providers.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/alert-providers.md)
+- **Index template missing**: Without an index template, Elasticsearch uses dynamic mapping which may produce suboptimal field types. Create the template as described in [`alert-providers.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/alert-providers.md)
 
 Test manually:
 ```bash
@@ -666,4 +666,4 @@ If the UI loads but real-time updates fail:
 
 Reference configurations:
 
-- [`docs/reverse-proxy.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/reverse-proxy.md)
+- [`docs/reverse-proxy.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/reverse-proxy.md)

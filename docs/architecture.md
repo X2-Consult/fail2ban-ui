@@ -31,10 +31,10 @@ Fail2Ban UI consists of :
 - Ban Insights: country-level analytics with interactive 3D threat globe visualization
 
 Additional resources:
-- Alert provider documentation: [`docs/alert-providers.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/alert-providers.md)
-- Threat intelligence documentation: [`docs/threat-intel.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/threat-intel.md)
-- Container deployment guide: [`deployment/container/README.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/deployment/container/README.md)
-- systemd setup guide: [`deployment/systemd/README.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/deployment/systemd/README.md)
+- Alert provider documentation: [`docs/alert-providers.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/alert-providers.md)
+- Threat intelligence documentation: [`docs/threat-intel.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/threat-intel.md)
+- Container deployment guide: [`deployment/container/README.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/deployment/container/README.md)
+- systemd setup guide: [`deployment/systemd/README.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/deployment/systemd/README.md)
 
 ## More detailed diagrams
 

@@ -38,7 +38,7 @@ If the proxy **strips** a path prefix before forwarding (e.g. external `/myf2b/`
 
 ## Subpath (`BASE_PATH`)
 
-When Fail2Ban UI runs with `BASE_PATH=/myf2b` (see [`docs/configuration.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/configuration.md)):
+When Fail2Ban UI runs with `BASE_PATH=/myf2b` (see [`docs/configuration.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/configuration.md)):
 
 - Proxy `location` should match the prefix and pass the **same** path to the backend (no strip), e.g. `https://host/myf2b/api/version` -> upstream `http://127.0.0.1:8080/myf2b/api/version`.
 - WebSocket URL in the browser becomes `wss://host/myf2b/api/ws`.

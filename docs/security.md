@@ -12,7 +12,7 @@ This project can perform security-sensitive operations (bans, configuration chan
 
 If you must publish it, put it behind TLS and an authentication layer, and restrict source IPs.
 
-See [`docs/reverse-proxy.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/reverse-proxy.md) for hardened proxy examples and WebSocket forwarding requirements.
+See [`docs/reverse-proxy.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/reverse-proxy.md) for hardened proxy examples and WebSocket forwarding requirements.
 
 ## Input validation
 

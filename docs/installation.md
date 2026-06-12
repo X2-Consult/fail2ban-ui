@@ -16,14 +16,14 @@ Additional resources:
 
 Local connector example (Fail2Ban runs on the same host):
 ```bash
-podman pull swissmakers/fail2ban-ui:latest
+podman pull ghcr.io/x2-consult/fail2ban-ui:latest
 
 podman run -d --name fail2ban-ui --network=host \
   -v /opt/fail2ban-ui:/config:Z \
   -v /etc/fail2ban:/etc/fail2ban:Z \
   -v /var/run/fail2ban:/var/run/fail2ban \
   -v /var/log:/var/log:ro \
-  swissmakers/fail2ban-ui:latest
+  ghcr.io/x2-consult/fail2ban-ui:latest
 ````
 
 Notes:
@@ -91,7 +91,7 @@ The workflow also pushes to Docker Hub when `DOCKERHUB_USERNAME` and `DOCKERHUB_
 Additional resources:
 
 * Full guide: `deployment/systemd/README.md`
-* SELinux and Fail2Ban -> UI HTTP callbacks: [`docs/security.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/security.md#selinux) (often `setsebool -P nis_enabled 1` on RHEL-family hosts)
+* SELinux and Fail2Ban -> UI HTTP callbacks: [`docs/security.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/security.md#selinux) (often `setsebool -P nis_enabled 1` on RHEL-family hosts)
 
 ### Option A: Automated installer (Ubuntu/Debian — recommended)
 
@@ -145,5 +145,5 @@ For production deployments:
 - Keep the UI behind a reverse proxy (TLS termination + access controls).
 - Bind the UI to loopback (`BIND_ADDRESS=127.0.0.1`) when proxy and app share the host.
 
-Reference: [`docs/reverse-proxy.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/reverse-proxy.md).
+Reference: [`docs/reverse-proxy.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/reverse-proxy.md).
 

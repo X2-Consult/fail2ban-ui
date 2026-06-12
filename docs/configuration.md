@@ -16,7 +16,7 @@ Example:
 -e PORT=3080 -e BIND_ADDRESS=127.0.0.1
 ```
 
-For production reverse proxy patterns, see [`docs/reverse-proxy.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/reverse-proxy.md).
+For production reverse proxy patterns, see [`docs/reverse-proxy.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/reverse-proxy.md).
 
 ## HTTP base path (for subpath deployment)
 
@@ -28,7 +28,7 @@ Rules:
 
 - Use a single leading slash and no trailing slash (e.g. `/myf2b`, not `myf2b/`).
 - When set, the app is served under that prefix. Visiting `/` redirects to `{BASE_PATH}/`, and non-prefixed paths are not served.
-- The reverse proxy must forward requests **with this path prefix** to Fail2Ban UI (see [`docs/reverse-proxy.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/reverse-proxy.md)).
+- The reverse proxy must forward requests **with this path prefix** to Fail2Ban UI (see [`docs/reverse-proxy.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/reverse-proxy.md)).
 
 When `BASE_PATH` is set, you must align related URLs:
 
@@ -76,7 +76,7 @@ With a subpath:
   openssl rand -hex 32
   ```
 
-  See [`docs/security.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/security.md) for migration notes and key rotation guidance.
+  See [`docs/security.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/security.md) for migration notes and key rotation guidance.
 
 ## SSH connector settings
 
@@ -87,7 +87,7 @@ With a subpath:
   SSH_KNOWN_HOSTS=/etc/fail2ban-ui/known_hosts
   ```
 
-  On first connection to a new host the key is accepted automatically and saved to this file (TOFU). On subsequent connections, a key mismatch is rejected. See [`docs/security.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/security.md) for details.
+  On first connection to a new host the key is accepted automatically and saved to this file (TOFU). On subsequent connections, a key mismatch is rejected. See [`docs/security.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/security.md) for details.
 
 ## Privacy and telemetry controls
 
@@ -119,8 +119,8 @@ Configure in **Settings -> Alert Settings**:
 
 Detailed provider behavior and payloads:
 
-- [`docs/alert-providers.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/alert-providers.md)
-- [`docs/webhooks.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/webhooks.md)
+- [`docs/alert-providers.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/alert-providers.md)
+- [`docs/webhooks.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/webhooks.md)
 
 ## Threat intelligence settings (UI-managed)
 
@@ -136,7 +136,7 @@ Runtime notes:
 - Successful responses are cached for 30 minutes (provider+IP)
 - Upstream `429` triggers retry-window/backoff with stale-cache fallback
 
-See [`docs/threat-intel.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/threat-intel.md) for full details.
+See [`docs/threat-intel.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/threat-intel.md) for full details.
 
 ## OIDC authentication
 

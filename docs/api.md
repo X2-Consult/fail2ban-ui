@@ -57,7 +57,14 @@ All endpoints that accept IP addresses validate them server-side using Go's `net
 - `POST /api/settings/test-webhook` -> Send a test webhook payload (Webhook provider)
 - `POST /api/settings/test-elasticsearch` -> Index a test document (Elasticsearch provider)
 
-The settings payload includes alert provider configuration (`alertProvider`, `webhook`, `elasticsearch` fields). See [`alert-providers.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/alert-providers.md) for the full provider documentation.
+The settings payload includes alert provider configuration (`alertProvider`, `webhook`, `elasticsearch` fields). See [`alert-providers.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/alert-providers.md) for the full provider documentation.
+
+### Ignore list
+- `GET /api/ignorelist` -> List all ignored IPs, CIDRs, and hostnames
+- `POST /api/ignorelist` -> Add an entry to the ignore list (pushes to all servers and reloads Fail2Ban)
+- `DELETE /api/ignorelist` -> Remove an entry from the ignore list (pushes to all servers and reloads Fail2Ban)
+
+The ignore list corresponds to Fail2Ban's `ignoreip` setting. Entries are pushed to every configured server on write. The dashboard also exposes an "Unban & Ignore" action that unbans an IP and adds it to the ignore list in a single operation.
 
 ### Filter management
 - `GET /api/filters` -> List available filters
@@ -79,7 +86,7 @@ Notes:
 - Uses provider+IP cache (30 minutes) and upstream 429 retry/backoff handling.
 - May include `X-Threat-Intel-Cache: hit|stale` response header.
 
-For full setup and behavior details, see [`docs/threat-intel.md`](https://github.com/swissmakers/fail2ban-ui/blob/main/docs/threat-intel.md).
+For full setup and behavior details, see [`docs/threat-intel.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/threat-intel.md).
 
 ### Version
 - `GET /api/version` -> Get running version and optional update check
