@@ -28,7 +28,7 @@ RUN set -eux; \
 # ===================================
 #  STAGE 2 -- Standalone UI Version
 # ===================================
-FROM --platform=$TARGETPLATFORM alpine:3.23 AS standalone-ui
+FROM alpine:3.24 AS standalone-ui
 
 # Install required container dependencies
 RUN set -eux; \
@@ -36,6 +36,9 @@ RUN set -eux; \
     apk upgrade --no-cache; \
     apk add --no-cache \
     bash curl whois tzdata jq ca-certificates htop fail2ban geoip openssh-client; \
+    # Nothing uses wget; drop the busybox applet (CVE-2025-60876, unfixed upstream)
+    apk del --no-cache ssl_client; \
+    rm -f /usr/bin/wget; \
     adduser -D -u 1000 -G root fail2ban
 
 RUN mkdir -p /app /config /config/.ssh \
