@@ -1,7 +1,7 @@
 # =========================================
 #  STAGE 1 -- Build Fail2Ban-UI Binary
 # =========================================
-FROM --platform=$BUILDPLATFORM golang:1.25.8 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27.3 AS builder
 WORKDIR /app
 
 # Copy module files and download dependencies
@@ -35,7 +35,7 @@ RUN set -eux; \
     apk update; \
     apk upgrade --no-cache; \
     apk add --no-cache \
-    bash curl wget whois tzdata jq ca-certificates htop fail2ban geoip openssh-client; \
+    bash curl whois tzdata jq ca-certificates htop fail2ban geoip openssh-client; \
     adduser -D -u 1000 -G root fail2ban
 
 RUN mkdir -p /app /config /config/.ssh \
