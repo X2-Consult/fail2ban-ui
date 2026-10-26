@@ -64,6 +64,24 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-,format=short
 
+      - name: Build image for scanning
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: fail2ban-ui:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: TMAS artifact scan
+        uses: ./.github/actions/tmas-scan
+        with:
+          image: fail2ban-ui:scan
+          api-key: ${{ secrets.TMAS_API_KEY }}
+          region: ${{ vars.TMAS_REGION || 'ap-southeast-2' }}
+          fail-on-severity: ${{ vars.TMAS_FAIL_ON || 'critical' }}
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:

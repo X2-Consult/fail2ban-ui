@@ -1,0 +1,96 @@
+name: TMAS scan
+description: Scan a local Docker image with Trend Micro Artifact Scanner (vulnerabilities, malware, secrets)
+
+inputs:
+  image:
+    description: Local image reference to scan (must already be loaded into the Docker daemon)
+    required: true
+  api-key:
+    description: Vision One API key with the "Run artifact scan" permission
+    required: false
+    default: ''
+  region:
+    description: Vision One region (e.g. ap-southeast-2, us-east-1, eu-central-1)
+    required: false
+    default: ap-southeast-2
+  fail-on-severity:
+    description: Fail when vulnerabilities at or above this severity are found (critical, high, medium, low, none)
+    required: false
+    default: critical
+
+runs:
+  using: composite
+  steps:
+    - name: Check TMAS API key
+      id: check
+      shell: bash
+      env:
+        TMAS_API_KEY: ${{ inputs.api-key }}
+      run: |
+        if [ -n "$TMAS_API_KEY" ]; then
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "enabled=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::TMAS_API_KEY secret not set - skipping artifact scan"
+        fi
+
+    - name: Install TMAS CLI
+      if: steps.check.outputs.enabled == 'true'
+      shell: bash
+      run: |
+        mkdir -p "$RUNNER_TEMP/tmas"
+        curl -fsSL https://ast-cli.xdr.trendmicro.com/tmas-cli/latest/tmas-cli_Linux_x86_64.tar.gz \
+          | tar -xz -C "$RUNNER_TEMP/tmas"
+        echo "$RUNNER_TEMP/tmas" >> "$GITHUB_PATH"
+
+    - name: Run TMAS scan
+      if: steps.check.outputs.enabled == 'true'
+      shell: bash
+      env:
+        TMAS_API_KEY: ${{ inputs.api-key }}
+      run: |
+        tmas scan "docker:${{ inputs.image }}" -V -M -S \
+          --region "${{ inputs.region }}" > "$RUNNER_TEMP/tmas-report.json"
+
+    - name: Upload TMAS report
+      if: always() && steps.check.outputs.enabled == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: tmas-report-${{ github.run_id }}
+        path: ${{ runner.temp }}/tmas-report.json
+        if-no-files-found: ignore
+
+    - name: Evaluate TMAS results
+      if: steps.check.outputs.enabled == 'true'
+      shell: bash
+      env:
+        FAIL_ON: ${{ inputs.fail-on-severity }}
+      run: |
+        r="$RUNNER_TEMP/tmas-report.json"
+        crit=$(jq '.vulnerabilities.criticalCount // 0' "$r")
+        high=$(jq '.vulnerabilities.highCount // 0' "$r")
+        med=$(jq '.vulnerabilities.mediumCount // 0' "$r")
+        low=$(jq '.vulnerabilities.lowCount // 0' "$r")
+        malware=$(jq '[.malware.findings // [] | .[]] | length' "$r")
+        secrets=$(jq '.secrets.unmitigatedFindingsCount // 0' "$r")
+
+        {
+          echo "### TMAS scan: \`${{ inputs.image }}\`"
+          echo "| Critical | High | Medium | Low | Malware | Secrets |"
+          echo "|---|---|---|---|---|---|"
+          echo "| $crit | $high | $med | $low | $malware | $secrets |"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        case "$FAIL_ON" in
+          critical) bad=$crit ;;
+          high)     bad=$((crit + high)) ;;
+          medium)   bad=$((crit + high + med)) ;;
+          low)      bad=$((crit + high + med + low)) ;;
+          *)        bad=0 ;;
+        esac
+
+        fail=0
+        [ "$bad" -gt 0 ]     && { echo "::error::$bad vulnerabilities at or above '$FAIL_ON' severity"; fail=1; }
+        [ "$malware" -gt 0 ] && { echo "::error::$malware malware findings"; fail=1; }
+        [ "$secrets" -gt 0 ] && { echo "::error::$secrets unmitigated secret findings"; fail=1; }
+        exit $fail
