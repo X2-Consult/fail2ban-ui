@@ -78,13 +78,26 @@ ghcr.io/x2-consult/fail2ban-ui:latest
 ghcr.io/x2-consult/fail2ban-ui:sha-<short-sha>
 ```
 
+Pushing a `v*` tag (e.g. `v1.4.9`) triggers `.github/workflows/release.yml`, which pushes versioned tags and creates a GitHub release with generated release notes:
+
+```
+ghcr.io/x2-consult/fail2ban-ui:1.4.9
+ghcr.io/x2-consult/fail2ban-ui:1.4
+ghcr.io/x2-consult/fail2ban-ui:1
+ghcr.io/x2-consult/fail2ban-ui:latest
+```
+
+Before tagging, bump `Version` in `internal/version/version.go` to match (e.g. `1.4.9-x2`). The in-app update check compares it against the latest GitHub release.
+
 Use this in your compose file:
 
 ```yaml
 image: ghcr.io/x2-consult/fail2ban-ui:latest
 ```
 
-The workflow also pushes to Docker Hub when `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets are set.
+Both workflows also push to Docker Hub when `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets are set.
+
+Before pushing, both workflows scan the image with Trend Micro Artifact Scanner (TMAS) and stop if it finds critical vulnerabilities, malware, or secrets. The scan needs a `TMAS_API_KEY` repository secret. See [`docs/security.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/security.md#container-image-scanning-tmas) for setup.
 
 ## systemd deployment (standalone)
 

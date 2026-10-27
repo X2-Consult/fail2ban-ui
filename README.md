@@ -74,7 +74,7 @@ Next steps:
 * Configuration reference (env vars, callback URL/secret, OIDC): [`docs/configuration.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/configuration.md)
 * Reverse proxy guide: [`docs/reverse-proxy.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/reverse-proxy.md)
 * Webhook integration guide: [`docs/webhooks.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/webhooks.md)
-* Security guidance (recommended deployment posture): [`docs/security.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/security.md)
+* Security guidance (recommended deployment posture, CI image scanning): [`docs/security.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/security.md)
 * Architecture overview: [`docs/architecture.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/architecture.md)
 * API reference: [`docs/api.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/api.md)
 * Alert providers (Email, Webhook, Elasticsearch): [`docs/alert-providers.md`](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/alert-providers.md)

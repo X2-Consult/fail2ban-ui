@@ -203,6 +203,91 @@ ENCRYPTION_KEY=a3f1...c9d2
 
 > If `ENCRYPTION_KEY` is removed after credentials have been encrypted, startup will log decrypt warnings and the raw `enc:...` ciphertext will be used as the value — effectively breaking those integrations. Always keep a backup of the key alongside your database backup.
 
+## Container image scanning (TMAS)
+
+Both CI workflows (`build.yml` on pushes to `main`, `release.yml` on `v*` tags) scan the container image with **Trend Micro Artifact Scanner (TMAS)** before anything is pushed to a registry. A failed scan stops the workflow, so no image or release is published.
+
+### How it works
+
+```
+Build amd64 image locally (fail2ban-ui:scan)
+  → TMAS scans it for vulnerabilities, malware, and secrets
+    → results are checked against the severity threshold
+      → pass: multi-arch build (amd64 + arm64) is pushed (and the GitHub release is created)
+      → fail: workflow stops, nothing is published
+```
+
+The scan logic lives in a shared composite action, `.github/actions/tmas-scan/action.yml`, used by both workflows. The multi-arch build that follows reuses the build cache, so the extra scan build adds little time.
+
+The build fails when any of the following are found:
+
+- Vulnerabilities at or above the configured severity (default: `critical`)
+- Any malware
+- Any unmitigated secrets (API keys, private keys, tokens baked into the image)
+
+If the `TMAS_API_KEY` secret is not set, the scan is **skipped with a warning** and the build continues. This keeps forks without a Vision One tenant building, but means a missing secret silently disables the gate. Check for the `TMAS_API_KEY secret not set` warning on the run page.
+
+### Setup
+
+**1. Create a Vision One API key**
+
+In Vision One, go to **Administration → API Keys** and add a key (e.g. `fail2ban-ui-ci`). Assign a custom role with only the Artifact Scanner **Run artifact scan** permission. This is separate from the Suspicious Objects key used by the [Vision One integration](https://github.com/X2-Consult/fail2ban-ui/blob/main/docs/integrations.md#trend-micro-vision-one). Keep the two keys separate so each has the minimum permissions.
+
+**2. Add the repository secret and variables**
+
+In the GitHub repository, go to **Settings → Secrets and variables → Actions**:
+
+| Type | Name | Required | Default | Description |
+|---|---|---|---|---|
+| Secret | `TMAS_API_KEY` | Yes | — | The Vision One API key from step 1 |
+| Variable | `TMAS_REGION` | No | `ap-southeast-2` | Region of your Vision One tenant (see below) |
+| Variable | `TMAS_FAIL_ON` | No | `critical` | Lowest severity that fails the build: `critical`, `high`, `medium`, `low`, or `none` |
+
+`TMAS_FAIL_ON=none` still runs the scan and uploads the report, but only malware and secrets fail the build. Use it to temporarily unblock builds while fixing vulnerabilities.
+
+**3. Pick the region**
+
+TMAS uses AWS-style region codes that match your Vision One tenant's data residency:
+
+| Vision One region | `TMAS_REGION` |
+|---|---|
+| United States | `us-east-1` |
+| Australia | `ap-southeast-2` |
+| Canada | `ca-central-1` |
+| Germany (EU) | `eu-central-1` |
+| India | `ap-south-1` |
+| Japan | `ap-northeast-1` |
+| Singapore | `ap-southeast-1` |
+| United Arab Emirates | `me-central-1` |
+| United Kingdom | `eu-west-2` |
+
+### Reading the results
+
+Each workflow run shows:
+
+- **Job summary**: a table of critical / high / medium / low vulnerability counts plus malware and secret findings.
+- **Annotations**: an error per failed check (e.g. `15 vulnerabilities at or above 'critical' severity`).
+- **Artifact** `tmas-report-<run id>`: the full JSON report, with every finding, package, installed version, and fixed version. It is uploaded even when the scan fails.
+
+### Fixing findings
+
+Most findings fall into one of three groups:
+
+| Source | Example package | Fix |
+|---|---|---|
+| Go standard library | `stdlib go1.x.y` | Bump the `golang:` builder image in the `Dockerfile` to a supported Go release |
+| Go modules | `golang.org/x/net`, `github.com/jackc/pgx/v5` | `go get <module>@latest && go mod tidy`; check locally with `govulncheck ./...` |
+| Alpine packages | `python3`, `busybox`, `nghttp2-libs` | Bump the `alpine:` base image; `apk upgrade` in the `Dockerfile` picks up patch releases on each build |
+
+Alpine findings with a fixed version of `Unknown` have no upstream fix yet. Check the [Alpine security tracker](https://security.alpinelinux.org/) and remove the affected package if nothing uses it.
+
+**Known open finding:** CVE-2025-60876 (busybox `wget` header injection) has no fix in any Alpine release. It is mitigated in the image by removing the busybox `wget` applet and the `ssl_client` package, but TMAS still reports it against the `busybox` package version. It is medium severity and does not fail the default threshold.
+
+### Limitations
+
+- Only the **amd64** image is scanned. The arm64 image is built from the same Dockerfile and dependencies but is not scanned separately.
+- The scan runs on each build. A vulnerability published after a release will not be caught until the next build or release.
+
 ## Audit and operational practices
 
 - Back up `/config` (DB + settings) regularly.
